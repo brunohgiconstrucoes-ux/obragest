@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { ArrowLeft, Edit, Plus, FileText, ClipboardList, Wrench, Users, TrendingUp, ExternalLink } from 'lucide-react'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { supabase } from '@/lib/supabase'
@@ -184,7 +184,7 @@ function MaterialDialog({ obraId, onSaved }: { obraId: string; onSaved: () => vo
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<MaterialFormValues>({
+  const { register, handleSubmit, reset, control, formState: { errors } } = useForm<MaterialFormValues>({
     resolver: zodResolver(materialSchema),
     defaultValues: {
       data_compra: today(),
@@ -241,11 +241,13 @@ function MaterialDialog({ obraId, onSaved }: { obraId: string; onSaved: () => vo
     })
 
     if (fluxoErr) {
-      toast({ description: 'Material salvo, mas erro no fluxo de caixa.', variant: 'destructive' })
-    } else {
-      toast({ description: 'Material lançado com sucesso.' })
+      await supabase.from('materiais').delete().eq('id', mat.id)
+      toast({ description: 'Erro ao lançar no fluxo de caixa. Nenhum dado foi salvo.', variant: 'destructive' })
+      setSaving(false)
+      return
     }
 
+    toast({ description: 'Material lançado com sucesso.' })
     reset({ data_compra: today(), categoria: 'outros', forma_pagamento: 'avista' })
     setOpen(false)
     onSaved()
@@ -278,29 +280,41 @@ function MaterialDialog({ obraId, onSaved }: { obraId: string; onSaved: () => vo
             </div>
             <div>
               <Label className="text-[var(--color-muted)] text-xs">Categoria *</Label>
-              <Select defaultValue="outros" onValueChange={v => setValue('categoria', v as MaterialCategoria)}>
-                <SelectTrigger className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-[var(--color-surface)] border-[var(--color-border)]">
-                  {(Object.entries(categoriaLabel) as [MaterialCategoria, string][]).map(([v, l]) => (
-                    <SelectItem key={v} value={v}>{l}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Controller
+                control={control}
+                name="categoria"
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[var(--color-surface)] border-[var(--color-border)]">
+                      {(Object.entries(categoriaLabel) as [MaterialCategoria, string][]).map(([v, l]) => (
+                        <SelectItem key={v} value={v}>{l}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
             </div>
             <div>
               <Label className="text-[var(--color-muted)] text-xs">Forma de Pagamento *</Label>
-              <Select defaultValue="avista" onValueChange={v => setValue('forma_pagamento', v as FormaPagamento)}>
-                <SelectTrigger className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-[var(--color-surface)] border-[var(--color-border)]">
-                  {(Object.entries(formaPagLabel) as [FormaPagamento, string][]).map(([v, l]) => (
-                    <SelectItem key={v} value={v}>{l}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Controller
+                control={control}
+                name="forma_pagamento"
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[var(--color-surface)] border-[var(--color-border)]">
+                      {(Object.entries(formaPagLabel) as [FormaPagamento, string][]).map(([v, l]) => (
+                        <SelectItem key={v} value={v}>{l}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
             </div>
             <div>
               <Label className="text-[var(--color-muted)] text-xs">Quantidade</Label>
@@ -412,11 +426,13 @@ function NfDialog({ obraId, onSaved }: { obraId: string; onSaved: () => void }) 
     })
 
     if (fluxoErr) {
-      toast({ description: 'NF salva, mas erro no fluxo de caixa.', variant: 'destructive' })
-    } else {
-      toast({ description: 'NF lançada com sucesso.' })
+      await supabase.from('mao_de_obra').delete().eq('id', mo.id)
+      toast({ description: 'Erro ao lançar no fluxo de caixa. Nenhum dado foi salvo.', variant: 'destructive' })
+      setSaving(false)
+      return
     }
 
+    toast({ description: 'NF lançada com sucesso.' })
     reset({ data_pagamento: today() })
     setOpen(false)
     onSaved()
