@@ -42,7 +42,7 @@ export type FormaPagamento =
   | 'cheque'
   | 'prazo'
 
-export interface Perfil {
+export type Perfil = {
   id: string
   razao_social: string | null
   cnpj: string | null
@@ -62,7 +62,7 @@ export interface Perfil {
   updated_at: string
 }
 
-export interface Obra {
+export type Obra = {
   id: string
   user_id: string
   nome: string
@@ -83,7 +83,7 @@ export interface Obra {
   updated_at: string
 }
 
-export interface PlanilhaItem {
+export type PlanilhaItem = {
   id: string
   obra_id: string
   user_id: string
@@ -98,7 +98,7 @@ export interface PlanilhaItem {
   updated_at: string
 }
 
-export interface Medicao {
+export type Medicao = {
   id: string
   obra_id: string
   user_id: string
@@ -121,7 +121,7 @@ export interface Medicao {
   updated_at: string
 }
 
-export interface MedicaoItem {
+export type MedicaoItem = {
   id: string
   medicao_id: string
   planilha_item_id: string
@@ -135,7 +135,7 @@ export interface MedicaoItem {
   created_at: string
 }
 
-export interface MaoDeObra {
+export type MaoDeObra = {
   id: string
   obra_id: string
   user_id: string
@@ -162,7 +162,7 @@ export interface MaoDeObra {
   updated_at: string
 }
 
-export interface Material {
+export type Material = {
   id: string
   obra_id: string
   user_id: string
@@ -180,7 +180,7 @@ export interface Material {
   updated_at: string
 }
 
-export interface FluxoCaixa {
+export type FluxoCaixa = {
   id: string
   user_id: string
   escopo: FluxoEscopo
@@ -200,7 +200,7 @@ export interface FluxoCaixa {
   updated_at: string
 }
 
-export interface ExportacaoContador {
+export type ExportacaoContador = {
   id: string
   user_id: string
   mes_referencia: number
@@ -214,7 +214,7 @@ export interface ExportacaoContador {
   created_at: string
 }
 
-export interface VwPlanilhaSaldo {
+export type VwPlanilhaSaldo = {
   planilha_item_id: string
   obra_id: string
   user_id: string
@@ -230,7 +230,7 @@ export interface VwPlanilhaSaldo {
   percentual_executado: number
 }
 
-export interface VwObraKpis {
+export type VwObraKpis = {
   obra_id: string
   user_id: string
   valor_contratado: number
@@ -416,54 +416,65 @@ export type Database = {
         Row: Perfil
         Insert: Omit<Perfil, 'created_at' | 'updated_at'>
         Update: Partial<Omit<Perfil, 'id' | 'created_at'>>
+        Relationships: []
       }
       obras: {
         Row: Obra
         Insert: Omit<Obra, 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Omit<Obra, 'id' | 'user_id' | 'created_at'>>
+        Relationships: []
       }
       planilha_itens: {
         Row: PlanilhaItem
         Insert: Omit<PlanilhaItem, 'id' | 'valor_total' | 'created_at' | 'updated_at'>
         Update: Partial<Omit<PlanilhaItem, 'id' | 'user_id' | 'valor_total' | 'created_at'>>
+        Relationships: []
       }
       medicoes: {
         Row: Medicao
         Insert: Omit<Medicao, 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Omit<Medicao, 'id' | 'user_id' | 'created_at'>>
+        Relationships: []
       }
       medicao_itens: {
         Row: MedicaoItem
         Insert: Omit<MedicaoItem, 'id' | 'valor_total' | 'created_at'>
-        Update: never
+        Update: Record<string, never>
+        Relationships: []
       }
       mao_de_obra: {
         Row: MaoDeObra
         Insert: Omit<MaoDeObra, 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Omit<MaoDeObra, 'id' | 'user_id' | 'created_at'>>
+        Relationships: []
       }
       materiais: {
         Row: Material
         Insert: Omit<Material, 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Omit<Material, 'id' | 'user_id' | 'created_at'>>
+        Relationships: []
       }
       fluxo_caixa: {
         Row: FluxoCaixa
         Insert: Omit<FluxoCaixa, 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Omit<FluxoCaixa, 'id' | 'user_id' | 'created_at'>>
+        Relationships: []
       }
       exportacoes_contador: {
         Row: ExportacaoContador
         Insert: Omit<ExportacaoContador, 'id' | 'gerado_em' | 'created_at'>
         Update: Partial<Omit<ExportacaoContador, 'id' | 'user_id' | 'created_at'>>
+        Relationships: []
       }
     }
     Views: {
       vw_planilha_saldo: {
         Row: VwPlanilhaSaldo
+        Relationships: []
       }
       vw_obra_kpis: {
         Row: VwObraKpis
+        Relationships: []
       }
     }
     Functions: {}
