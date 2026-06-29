@@ -23,13 +23,12 @@ ALTER TABLE obras
   ALTER COLUMN valor_total TYPE bigint
   USING round(valor_total * 100)::bigint;
 
--- planilha_itens: valor_unitario + valor_total (coluna gerada)
+-- planilha_itens: dropar gerada primeiro, depois alterar base, recriar
+ALTER TABLE planilha_itens DROP COLUMN valor_total;
+
 ALTER TABLE planilha_itens
   ALTER COLUMN valor_unitario TYPE bigint
   USING round(valor_unitario * 100)::bigint;
-
-ALTER TABLE planilha_itens
-  DROP COLUMN valor_total;
 
 ALTER TABLE planilha_itens
   ADD COLUMN valor_total bigint
@@ -45,13 +44,12 @@ ALTER TABLE medicoes
   ALTER COLUMN valor_liquido      TYPE bigint USING round(valor_liquido      * 100)::bigint,
   ALTER COLUMN valor_recebido     TYPE bigint USING round(valor_recebido     * 100)::bigint;
 
--- medicao_itens: valor_unitario + valor_total (coluna gerada)
+-- medicao_itens: dropar gerada primeiro, depois alterar base, recriar
+ALTER TABLE medicao_itens DROP COLUMN valor_total;
+
 ALTER TABLE medicao_itens
   ALTER COLUMN valor_unitario TYPE bigint
   USING round(valor_unitario * 100)::bigint;
-
-ALTER TABLE medicao_itens
-  DROP COLUMN valor_total;
 
 ALTER TABLE medicao_itens
   ADD COLUMN valor_total bigint
