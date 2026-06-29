@@ -1,88 +1,87 @@
 -- ============================================================
 -- Migration 0002 — Converter colunas monetárias de numeric(14,2)
 --                  para bigint (centavos inteiros)
--- Sistema de Gestão de Construtora (Licitação Pública)
 --
 -- ATENÇÃO: execute no SQL Editor do Supabase.
--- As views devem ser dropadas antes dos ALTERs porque o PostgreSQL
--- não permite alterar o tipo de colunas referenciadas por views.
+-- Ordem obrigatória:
+--   1. Drop views (dependem das colunas)
+--   2. Drop colunas GENERATED (dependem das colunas base)
+--   3. Alter colunas base
+--   4. Recriar colunas GENERATED
+--   5. Recriar views
 -- ============================================================
 
 -- ============================================================
--- PASSO 1: Dropar views que dependem das colunas a alterar
+-- 1. Drop views dependentes
 -- ============================================================
 DROP VIEW IF EXISTS vw_obra_kpis;
 DROP VIEW IF EXISTS vw_planilha_saldo;
 
 -- ============================================================
--- PASSO 2: Alterar colunas monetárias para bigint (centavos)
+-- 2. Drop colunas GENERATED (devem sair antes das colunas base)
+-- ============================================================
+ALTER TABLE planilha_itens  DROP COLUMN valor_total;
+ALTER TABLE medicao_itens   DROP COLUMN valor_total;
+
+-- ============================================================
+-- 3. Alterar colunas base para bigint
 -- ============================================================
 
--- obras.valor_total
 ALTER TABLE obras
   ALTER COLUMN valor_total TYPE bigint
   USING round(valor_total * 100)::bigint;
 
--- planilha_itens: dropar gerada primeiro, depois alterar base, recriar
-ALTER TABLE planilha_itens DROP COLUMN valor_total;
-
 ALTER TABLE planilha_itens
   ALTER COLUMN valor_unitario TYPE bigint
   USING round(valor_unitario * 100)::bigint;
 
-ALTER TABLE planilha_itens
-  ADD COLUMN valor_total bigint
-    GENERATED ALWAYS AS (round(quantidade_contratada * valor_unitario)::bigint) STORED;
-
--- medicoes
 ALTER TABLE medicoes
-  ALTER COLUMN valor_bruto        TYPE bigint USING round(valor_bruto        * 100)::bigint,
-  ALTER COLUMN retencao_caucao    TYPE bigint USING round(retencao_caucao    * 100)::bigint,
-  ALTER COLUMN retencao_iss       TYPE bigint USING round(retencao_iss       * 100)::bigint,
-  ALTER COLUMN retencao_inss      TYPE bigint USING round(retencao_inss      * 100)::bigint,
-  ALTER COLUMN retencao_irrf      TYPE bigint USING round(retencao_irrf      * 100)::bigint,
-  ALTER COLUMN valor_liquido      TYPE bigint USING round(valor_liquido      * 100)::bigint,
-  ALTER COLUMN valor_recebido     TYPE bigint USING round(valor_recebido     * 100)::bigint;
-
--- medicao_itens: dropar gerada primeiro, depois alterar base, recriar
-ALTER TABLE medicao_itens DROP COLUMN valor_total;
+  ALTER COLUMN valor_bruto     TYPE bigint USING round(valor_bruto     * 100)::bigint,
+  ALTER COLUMN retencao_caucao TYPE bigint USING round(retencao_caucao * 100)::bigint,
+  ALTER COLUMN retencao_iss    TYPE bigint USING round(retencao_iss    * 100)::bigint,
+  ALTER COLUMN retencao_inss   TYPE bigint USING round(retencao_inss   * 100)::bigint,
+  ALTER COLUMN retencao_irrf   TYPE bigint USING round(retencao_irrf   * 100)::bigint,
+  ALTER COLUMN valor_liquido   TYPE bigint USING round(valor_liquido   * 100)::bigint,
+  ALTER COLUMN valor_recebido  TYPE bigint USING round(valor_recebido  * 100)::bigint;
 
 ALTER TABLE medicao_itens
   ALTER COLUMN valor_unitario TYPE bigint
   USING round(valor_unitario * 100)::bigint;
 
-ALTER TABLE medicao_itens
-  ADD COLUMN valor_total bigint
-    GENERATED ALWAYS AS (round(quantidade_executada * valor_unitario)::bigint) STORED;
-
--- mao_de_obra
 ALTER TABLE mao_de_obra
-  ALTER COLUMN valor_bruto    TYPE bigint USING round(valor_bruto    * 100)::bigint,
-  ALTER COLUMN retencao_inss  TYPE bigint USING round(retencao_inss  * 100)::bigint,
-  ALTER COLUMN retencao_iss   TYPE bigint USING round(retencao_iss   * 100)::bigint,
-  ALTER COLUMN retencao_irrf  TYPE bigint USING round(retencao_irrf  * 100)::bigint,
-  ALTER COLUMN valor_diaria   TYPE bigint USING round(valor_diaria   * 100)::bigint,
-  ALTER COLUMN valor_pago     TYPE bigint USING round(valor_pago     * 100)::bigint;
+  ALTER COLUMN valor_bruto   TYPE bigint USING round(valor_bruto   * 100)::bigint,
+  ALTER COLUMN retencao_inss TYPE bigint USING round(retencao_inss * 100)::bigint,
+  ALTER COLUMN retencao_iss  TYPE bigint USING round(retencao_iss  * 100)::bigint,
+  ALTER COLUMN retencao_irrf TYPE bigint USING round(retencao_irrf * 100)::bigint,
+  ALTER COLUMN valor_diaria  TYPE bigint USING round(valor_diaria  * 100)::bigint,
+  ALTER COLUMN valor_pago    TYPE bigint USING round(valor_pago    * 100)::bigint;
 
--- materiais
 ALTER TABLE materiais
   ALTER COLUMN valor_total TYPE bigint
   USING round(valor_total * 100)::bigint;
 
--- fluxo_caixa
 ALTER TABLE fluxo_caixa
   ALTER COLUMN valor TYPE bigint
   USING round(valor * 100)::bigint;
 
--- exportacoes_contador
 ALTER TABLE exportacoes_contador
   ALTER COLUMN total_valor TYPE bigint
   USING round(total_valor * 100)::bigint;
 
 -- ============================================================
--- PASSO 3: Recriar as views com definições idênticas ao SCHEMA.sql
+-- 4. Recriar colunas GENERATED com bigint
 -- ============================================================
+ALTER TABLE planilha_itens
+  ADD COLUMN valor_total bigint
+    GENERATED ALWAYS AS (round(quantidade_contratada * valor_unitario)::bigint) STORED;
 
+ALTER TABLE medicao_itens
+  ADD COLUMN valor_total bigint
+    GENERATED ALWAYS AS (round(quantidade_executada * valor_unitario)::bigint) STORED;
+
+-- ============================================================
+-- 5. Recriar views
+-- ============================================================
 CREATE OR REPLACE VIEW vw_planilha_saldo AS
 SELECT
   pi.id                                         AS planilha_item_id,
