@@ -92,7 +92,7 @@ export function LoginPage() {
               </div>
 
               {error && (
-                <p className="text-sm text-danger bg-danger/10 rounded-md px-3 py-2">{error}</p>
+                <p className="text-sm text-[var(--color-danger)] bg-[var(--color-danger)]/10 rounded-md px-3 py-2">{error}</p>
               )}
 
               <Button
