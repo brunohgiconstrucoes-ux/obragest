@@ -49,7 +49,8 @@ export function PlanilhaServicosPage() {
   }
 
   const somaItens = itens.reduce((acc, i) => acc + i.valor_total, 0)
-  const divergente = obra && Math.abs(somaItens - obra.valor_total) > 0.01
+  // Both somaItens and obra.valor_total are centavos (bigint) — compare as integers (threshold: 1 centavo)
+  const divergente = obra && Math.abs(somaItens - obra.valor_total) > 1
 
   function startEdit(item: PlanilhaItem) {
     setEditingId(item.id)
@@ -58,7 +59,8 @@ export function PlanilhaServicosPage() {
       descricao: item.descricao,
       unidade: item.unidade,
       quantidade_contratada: item.quantidade_contratada,
-      valor_unitario: item.valor_unitario,
+      // DB stores centavos (bigint) — show reais in the edit input
+      valor_unitario: item.valor_unitario / 100,
       ordem: item.ordem,
     })
   }
@@ -81,7 +83,8 @@ export function PlanilhaServicosPage() {
         descricao: editValues.descricao!,
         unidade: editValues.unidade!,
         quantidade_contratada: Number(editValues.quantidade_contratada),
-        valor_unitario: Number(editValues.valor_unitario),
+        // Input shows reais — convert back to centavos (bigint) for DB
+        valor_unitario: Math.round(Number(editValues.valor_unitario) * 100),
         ordem: Number(editValues.ordem),
       })
       .eq('id', itemId)
@@ -119,6 +122,7 @@ export function PlanilhaServicosPage() {
       .from('medicao_itens')
       .select('*', { count: 'exact', head: true })
       .eq('planilha_item_id', itemId)
+      .eq('user_id', user!.id)
     if ((count ?? 0) > 0) {
       alert('Não é possível excluir um item que já possui medição registrada.')
       return
@@ -148,7 +152,8 @@ export function PlanilhaServicosPage() {
       descricao: cols[1] || 'Item importado',
       unidade: cols[2] || 'un',
       quantidade_contratada: Number(cols[3]?.replace(',', '.') || 0),
-      valor_unitario: Number(cols[4]?.replace(',', '.') || 0),
+      // Excel values are in reais — convert to centavos (bigint) for DB
+      valor_unitario: Math.round(Number(cols[4]?.replace(',', '.') || 0) * 100),
       ordem: nextOrdem + idx,
     }))
     const { error } = await supabase.from('planilha_itens').insert(inserts)
@@ -391,14 +396,14 @@ export function PlanilhaServicosPage() {
                       </td>
                       <td className={`${tdClass} text-right font-mono`}>
                         {/*
-                          Preview correto: quantidade_contratada é adimensional (un/m/m²/etc.)
-                          e valor_unitario está em centavos (integer), portanto o produto
-                          já é centavos — ValorMonetario divide por 100 para exibir em R$.
+                          Preview: editValues.valor_unitario is in reais (user input).
+                          Multiply by 100 → centavos, then multiply by quantity → centavos total.
+                          ValorMonetario divides by 100 for display.
                         */}
                         <ValorMonetario
                           value={
                             (editValues.quantidade_contratada ?? 0) *
-                            (editValues.valor_unitario ?? 0)
+                            Math.round((editValues.valor_unitario ?? 0) * 100)
                           }
                         />
                       </td>

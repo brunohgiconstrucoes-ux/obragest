@@ -72,7 +72,7 @@ export type Obra = {
   art_rrt: string | null
   data_assinatura: string | null
   prazo_termino: string | null
-  valor_total: number
+  valor_total: number // centavos (bigint)
   endereco: string | null
   status: ObraStatus
   aliquota_caucao: number
@@ -91,8 +91,8 @@ export type PlanilhaItem = {
   descricao: string
   unidade: string
   quantidade_contratada: number
-  valor_unitario: number
-  valor_total: number
+  valor_unitario: number // centavos (bigint)
+  valor_total: number // centavos (bigint)
   ordem: number
   created_at: string
   updated_at: string
@@ -105,16 +105,16 @@ export type Medicao = {
   numero: number
   periodo_inicio: string
   periodo_fim: string
-  valor_bruto: number
-  retencao_caucao: number
-  retencao_iss: number
-  retencao_inss: number
-  retencao_irrf: number
-  valor_liquido: number
+  valor_bruto: number // centavos (bigint)
+  retencao_caucao: number // centavos (bigint)
+  retencao_iss: number // centavos (bigint)
+  retencao_inss: number // centavos (bigint)
+  retencao_irrf: number // centavos (bigint)
+  valor_liquido: number // centavos (bigint)
   status: MedicaoStatus
   data_prevista_recebimento: string | null
   data_recebimento: string | null
-  valor_recebido: number | null
+  valor_recebido: number | null // centavos (bigint)
   boletim_pdf_url: string | null
   incluir_contador: boolean
   created_at: string
@@ -129,9 +129,9 @@ export type MedicaoItem = {
   codigo: string | null
   descricao: string
   unidade: string
-  valor_unitario: number
+  valor_unitario: number // centavos (bigint)
   quantidade_executada: number
-  valor_total: number
+  valor_total: number // centavos (bigint)
   created_at: string
 }
 
@@ -144,15 +144,15 @@ export type MaoDeObra = {
   cpf_cnpj: string | null
   numero_nf: string | null
   funcao: string | null
-  valor_bruto: number | null
-  retencao_inss: number | null
-  retencao_iss: number | null
-  retencao_irrf: number | null
-  valor_diaria: number | null
+  valor_bruto: number | null // centavos (bigint)
+  retencao_inss: number | null // centavos (bigint)
+  retencao_iss: number | null // centavos (bigint)
+  retencao_irrf: number | null // centavos (bigint)
+  valor_diaria: number | null // centavos (bigint)
   quantidade_dias: number | null
   periodo_inicio: string | null
   periodo_fim: string | null
-  valor_pago: number
+  valor_pago: number // centavos (bigint)
   data_pagamento: string
   status: LancamentoStatus
   pdf_url: string | null
@@ -171,7 +171,7 @@ export type Material = {
   categoria: MaterialCategoria
   quantidade: number | null
   unidade: string | null
-  valor_total: number
+  valor_total: number // centavos (bigint)
   data_compra: string
   forma_pagamento: FormaPagamento
   incluir_contador: boolean
@@ -190,7 +190,7 @@ export type FluxoCaixa = {
   origem_id: string | null
   descricao: string
   categoria: string | null
-  valor: number
+  valor: number // centavos (bigint)
   data_lancamento: string
   status: LancamentoStatus
   data_realizacao: string | null
@@ -206,7 +206,7 @@ export type ExportacaoContador = {
   mes_referencia: number
   ano_referencia: number
   total_documentos: number
-  total_valor: number
+  total_valor: number // centavos (bigint)
   zip_url: string | null
   csv_url: string | null
   pdf_resumo_url: string | null
@@ -222,23 +222,23 @@ export type VwPlanilhaSaldo = {
   descricao: string
   unidade: string
   quantidade_contratada: number
-  valor_unitario: number
-  valor_contratado: number
+  valor_unitario: number // centavos (bigint)
+  valor_contratado: number // centavos (bigint)
   quantidade_medida: number
   quantidade_restante: number
-  valor_medido: number
+  valor_medido: number // centavos (bigint)
   percentual_executado: number
 }
 
 export type VwObraKpis = {
   obra_id: string
   user_id: string
-  valor_contratado: number
+  valor_contratado: number // centavos (bigint)
   percentual_executado: number
-  total_faturado: number
-  total_recebido: number
-  total_saidas: number
-  margem_real: number
+  total_faturado: number // centavos (bigint)
+  total_recebido: number // centavos (bigint)
+  total_saidas: number // centavos (bigint)
+  margem_real: number // centavos (bigint)
 }
 
 export type ObraFormData = {
