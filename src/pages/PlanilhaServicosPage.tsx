@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { Plus, AlertTriangle, ClipboardPaste, ChevronRight } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
+import { useToast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
@@ -16,6 +17,7 @@ type ItemComSaldo = PlanilhaItem & Partial<VwPlanilhaSaldo>
 export function PlanilhaServicosPage() {
   const { id: obraId } = useParams()
   const { user } = useAuth()
+  const { toast } = useToast()
   const [obra, setObra] = useState<Obra | null>(null)
   const [itens, setItens] = useState<ItemComSaldo[]>([])
   const [loading, setLoading] = useState(true)
@@ -67,6 +69,10 @@ export function PlanilhaServicosPage() {
   }
 
   async function saveEdit(itemId: string) {
+    if (!editValues.descricao?.trim()) {
+      toast({ title: 'Descrição obrigatória', description: 'Preencha a descrição do item antes de salvar.', variant: 'destructive' })
+      return
+    }
     setSaving(true)
     const { error } = await supabase
       .from('planilha_itens')
@@ -145,8 +151,12 @@ export function PlanilhaServicosPage() {
       valor_unitario: Number(cols[4]?.replace(',', '.') || 0),
       ordem: nextOrdem + idx,
     }))
-    await supabase.from('planilha_itens').insert(inserts)
+    const { error } = await supabase.from('planilha_itens').insert(inserts)
     setSaving(false)
+    if (error) {
+      toast({ title: 'Erro ao importar linhas', description: error.message, variant: 'destructive' })
+      return
+    }
     setDialogOpen(false)
     setPastaTexto('')
     setPreviewLinhas([])
@@ -380,6 +390,11 @@ export function PlanilhaServicosPage() {
                         />
                       </td>
                       <td className={`${tdClass} text-right font-mono`}>
+                        {/*
+                          Preview correto: quantidade_contratada é adimensional (un/m/m²/etc.)
+                          e valor_unitario está em centavos (integer), portanto o produto
+                          já é centavos — ValorMonetario divide por 100 para exibir em R$.
+                        */}
                         <ValorMonetario
                           value={
                             (editValues.quantidade_contratada ?? 0) *
