@@ -1,0 +1,96 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* shadcn/ui CSS variables (dark default) */
+  --background: 222 47% 7%;
+  --foreground: 210 40% 92%;
+  --card: 222 47% 11%;
+  --card-foreground: 210 40% 92%;
+  --popover: 222 47% 11%;
+  --popover-foreground: 210 40% 92%;
+  --primary: 38 92% 50%;
+  --primary-foreground: 222 47% 7%;
+  --secondary: 222 30% 18%;
+  --secondary-foreground: 210 40% 92%;
+  --muted: 222 30% 18%;
+  --muted-foreground: 215 20% 55%;
+  --accent: 222 30% 18%;
+  --accent-foreground: 210 40% 92%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 222 30% 22%;
+  --input: 222 30% 22%;
+  --ring: 38 92% 50%;
+  --radius: 0.5rem;
+
+  /* Dark mode (padrão) */
+  --color-bg:          #0F1117;
+  --color-surface:     #1A1D27;
+  --color-surface-2:   #242838;
+  --color-border:      #2E3348;
+  --color-primary:     #F59E0B;
+  --color-primary-dim: #B45309;
+  --color-success:     #10B981;
+  --color-danger:      #EF4444;
+  --color-warning:     #F59E0B;
+  --color-text:        #E5E7EB;
+  --color-muted:       #6B7280;
+  --color-pj:          #60A5FA;
+  --color-pf:          #A78BFA;
+}
+
+html.light {
+  /* shadcn/ui CSS variables (light) */
+  --background: 0 0% 97%;
+  --foreground: 222 47% 7%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 7%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 7%;
+  --primary: 38 92% 42%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 220 14% 96%;
+  --secondary-foreground: 222 47% 7%;
+  --muted: 220 14% 96%;
+  --muted-foreground: 215 16% 47%;
+  --accent: 220 14% 96%;
+  --accent-foreground: 222 47% 7%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 220 13% 89%;
+  --input: 220 13% 89%;
+  --ring: 38 92% 42%;
+
+
+  --color-bg:          #F8F9FB;
+  --color-surface:     #FFFFFF;
+  --color-surface-2:   #F1F3F7;
+  --color-border:      #E2E6EF;
+  --color-primary:     #D97706;
+  --color-primary-dim: #B45309;
+  --color-success:     #059669;
+  --color-danger:      #DC2626;
+  --color-warning:     #D97706;
+  --color-text:        #111827;
+  --color-muted:       #6B7280;
+  --color-pj:          #2563EB;
+  --color-pf:          #7C3AED;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: 'Inter', sans-serif;
+}
