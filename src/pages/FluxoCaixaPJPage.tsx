@@ -1,0 +1,8 @@
+export function FluxoCaixaPJPage() {
+  return (
+    <div className="text-[var(--color-text)]">
+      <h1 className="text-2xl font-bold">Fluxo de Caixa PJ</h1>
+      <p className="text-[var(--color-muted)] mt-2">Em construção...</p>
+    </div>
+  )
+}
