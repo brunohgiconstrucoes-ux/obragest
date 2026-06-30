@@ -5,6 +5,7 @@ import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Plus, CheckCircle } from 'lucide-react'
+import { parseCentavos, todayStr } from '@/lib/currency'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { useToast } from '@/hooks/use-toast'
@@ -50,14 +51,6 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function todayStr() {
-  return format(new Date(), 'yyyy-MM-dd')
-}
-
-function parseCentavos(str: string): number {
-  return Math.round(parseFloat(str.replace(/\./g, '').replace(',', '.')) * 100)
-}
 
 function origemLabel(origem: string): string {
   const map: Record<string, string> = {

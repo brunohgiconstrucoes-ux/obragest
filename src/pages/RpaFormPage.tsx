@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { format } from 'date-fns'
 import { ArrowLeft } from 'lucide-react'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { parseCentavos, todayStr } from '@/lib/currency'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { useToast } from '@/hooks/use-toast'
@@ -42,18 +42,6 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function today() {
-  return format(new Date(), 'yyyy-MM-dd')
-}
-
-function parseBRL(s: string): number {
-  // Accepts "1.234,56" or "1234.56" or "1234,56"
-  const norm = s.replace(/\./g, '').replace(',', '.')
-  return parseFloat(norm) || 0
-}
-
 // ── RpaFormPage ───────────────────────────────────────────────────────────────
 
 export function RpaFormPage() {
@@ -78,7 +66,7 @@ export function RpaFormPage() {
       cpf_cnpj: '',
       funcao: '',
       valor_bruto_reais: '',
-      data_pagamento: today(),
+      data_pagamento: todayStr(),
       observacao: '',
     },
   })
@@ -109,7 +97,7 @@ export function RpaFormPage() {
   }, [id, user, navigate, toast])
 
   // ── Derived calculations ──
-  const valorBrutoCentavos = Math.round(parseBRL(valorBrutoStr ?? '') * 100)
+  const valorBrutoCentavos = parseCentavos(valorBrutoStr ?? '')
 
   const aliquotaInss = obra?.aliquota_inss ?? 0
   const aliquotaIss = obra?.aliquota_iss ?? 0
@@ -126,7 +114,7 @@ export function RpaFormPage() {
     if (!user || !obra) return
     setSaving(true)
 
-    const valorBrutoCents = Math.round(parseBRL(values.valor_bruto_reais) * 100)
+    const valorBrutoCents = parseCentavos(values.valor_bruto_reais)
     const inss = Math.round(valorBrutoCents * obra.aliquota_inss / 100)
     const iss = Math.round(valorBrutoCents * obra.aliquota_iss / 100)
     const irrf = Math.round(valorBrutoCents * obra.aliquota_irrf / 100)

@@ -6,6 +6,7 @@ import { ArrowLeft, Edit, Plus, FileText, ClipboardList, Wrench, Users, Trending
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { todayStr } from '@/lib/currency'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { useToast } from '@/hooks/use-toast'
@@ -74,9 +75,6 @@ function fmtDate(d: string | null | undefined) {
   }
 }
 
-function today() {
-  return new Date().toISOString().split('T')[0]
-}
 
 // ── Small badge components ────────────────────────────────────────────────────
 
@@ -187,7 +185,7 @@ function MaterialDialog({ obraId, onSaved }: { obraId: string; onSaved: () => vo
   const { register, handleSubmit, reset, control, formState: { errors } } = useForm<MaterialFormValues>({
     resolver: zodResolver(materialSchema),
     defaultValues: {
-      data_compra: today(),
+      data_compra: todayStr(),
       categoria: 'outros',
       forma_pagamento: 'avista',
     },
@@ -248,7 +246,7 @@ function MaterialDialog({ obraId, onSaved }: { obraId: string; onSaved: () => vo
     }
 
     toast({ description: 'Material lançado com sucesso.' })
-    reset({ data_compra: today(), categoria: 'outros', forma_pagamento: 'avista' })
+    reset({ data_compra: todayStr(), categoria: 'outros', forma_pagamento: 'avista' })
     setOpen(false)
     onSaved()
     setSaving(false)
@@ -367,7 +365,7 @@ function NfDialog({ obraId, onSaved }: { obraId: string; onSaved: () => void }) 
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<NfFormValues>({
     resolver: zodResolver(nfSchema),
-    defaultValues: { data_pagamento: today() },
+    defaultValues: { data_pagamento: todayStr() },
   })
 
   async function onSubmit(values: NfFormValues) {
@@ -433,7 +431,7 @@ function NfDialog({ obraId, onSaved }: { obraId: string; onSaved: () => void }) 
     }
 
     toast({ description: 'NF lançada com sucesso.' })
-    reset({ data_pagamento: today() })
+    reset({ data_pagamento: todayStr() })
     setOpen(false)
     onSaved()
     setSaving(false)

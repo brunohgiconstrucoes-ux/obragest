@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { format } from 'date-fns'
 import { ArrowLeft } from 'lucide-react'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { parseCentavos, todayStr } from '@/lib/currency'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { useToast } from '@/hooks/use-toast'
@@ -65,17 +65,6 @@ const schema = z
 
 type FormValues = z.infer<typeof schema>
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function today() {
-  return format(new Date(), 'yyyy-MM-dd')
-}
-
-function parseBRL(s: string): number {
-  const norm = s.replace(/\./g, '').replace(',', '.')
-  return parseFloat(norm) || 0
-}
-
 // ── AvulsoFormPage ─────────────────────────────────────────────────────────────
 
 export function AvulsoFormPage() {
@@ -101,8 +90,8 @@ export function AvulsoFormPage() {
       funcao: '',
       valor_diaria_reais: '',
       quantidade_dias: '1',
-      periodo_inicio: today(),
-      periodo_fim: today(),
+      periodo_inicio: todayStr(),
+      periodo_fim: todayStr(),
       observacao: '',
     },
   })
@@ -134,7 +123,7 @@ export function AvulsoFormPage() {
   }, [id, user, navigate, toast])
 
   // ── Derived calculations ──
-  const valorDiariaCentavos = Math.round(parseBRL(valorDiariaStr ?? '') * 100)
+  const valorDiariaCentavos = parseCentavos(valorDiariaStr ?? '')
   const quantidadeDias = parseInt(quantidadeDiasStr ?? '1') || 0
   const valorPago = valorDiariaCentavos * quantidadeDias
 
@@ -143,7 +132,7 @@ export function AvulsoFormPage() {
     if (!user || !obra) return
     setSaving(true)
 
-    const diariaCents = Math.round(parseBRL(values.valor_diaria_reais) * 100)
+    const diariaCents = parseCentavos(values.valor_diaria_reais)
     const dias = parseInt(values.quantidade_dias)
     const totalCents = diariaCents * dias
 
