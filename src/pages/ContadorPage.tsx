@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { format, getDaysInMonth } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Download, Save } from 'lucide-react'
@@ -52,11 +52,18 @@ const MESES = [
 const currentYear = new Date().getFullYear()
 const YEARS = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i)
 
+const tipoBadgeStyle: Record<string, React.CSSProperties> = {
+  'Medição': { backgroundColor: 'var(--color-pj)', color: 'white' },
+  'Mão de obra': { backgroundColor: 'var(--color-success)', color: 'white' },
+  'Material': { backgroundColor: 'var(--color-warning)', color: 'white' },
+}
+
 // ── ContadorPage ───────────────────────────────────────────────────────────────
 
 export function ContadorPage() {
   const { user } = useAuth()
   const { toast } = useToast()
+  const selectAllRef = useRef<HTMLInputElement>(null)
 
   const now = new Date()
   const [mes, setMes] = useState(now.getMonth() + 1)
@@ -204,7 +211,7 @@ export function ContadorPage() {
     a.href = url
     a.download = `contador-${ano}-${String(mes).padStart(2, '0')}.csv`
     a.click()
-    URL.revokeObjectURL(url)
+    setTimeout(() => URL.revokeObjectURL(url), 100)
   }
 
   // ── Save historico ──────────────────────────────────────────────────────────
@@ -241,6 +248,14 @@ export function ContadorPage() {
   const totalMarcado = markedItems.reduce((a, i) => a + i.valor, 0)
   const allChecked = items.length > 0 && checkedIds.size === items.length
   const someChecked = checkedIds.size > 0
+  const indeterminate = checkedIds.size > 0 && checkedIds.size < items.length
+
+  // Update indeterminate state on select-all checkbox
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = indeterminate
+    }
+  }, [indeterminate])
 
   // ── Render ───────────────────────────────────────────────────────────────────
 
@@ -313,6 +328,7 @@ export function ContadorPage() {
                   <tr className="border-b border-[var(--color-border)] text-[var(--color-muted)]">
                     <th className="p-3 w-10">
                       <input
+                        ref={selectAllRef}
                         type="checkbox"
                         checked={allChecked}
                         onChange={e => toggleAll(e.target.checked)}
@@ -341,13 +357,10 @@ export function ContadorPage() {
                         />
                       </td>
                       <td className="p-3 text-[var(--color-text)]">
-                        <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
-                          item.tipo === 'Medição'
-                            ? 'bg-blue-100 text-blue-800'
-                            : item.tipo === 'Mão de obra'
-                            ? 'bg-purple-100 text-purple-800'
-                            : 'bg-orange-100 text-orange-800'
-                        }`}>
+                        <span
+                          className="inline-block px-2 py-0.5 rounded text-xs font-medium"
+                          style={tipoBadgeStyle[item.tipo] ?? {}}
+                        >
                           {item.tipo}
                         </span>
                       </td>
