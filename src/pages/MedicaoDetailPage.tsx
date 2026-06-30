@@ -24,9 +24,17 @@ const recebidoSchema = z.object({
   valor_recebido_reais: z
     .string()
     .min(1, 'Obrigatório')
-    .refine(v => !isNaN(parseFloat(v.replace(',', '.'))) && parseFloat(v.replace(',', '.')) > 0, {
-      message: 'Valor deve ser maior que zero',
-    }),
+    .refine(
+      v => {
+        // BRL-aware parser: strip periods (thousands), replace last comma with period (decimal)
+        const normalized = v.replace(/\./g, '').replace(',', '.')
+        const parsed = parseFloat(normalized)
+        return isFinite(parsed) && parsed > 0
+      },
+      {
+        message: 'Valor deve ser maior que zero',
+      }
+    ),
 })
 
 type RecebidoFormValues = z.infer<typeof recebidoSchema>
@@ -146,7 +154,8 @@ export function MedicaoDetailPage() {
     if (!medicao || !user) return
     setSaving(true)
 
-    const valorCentavos = Math.round(parseFloat(values.valor_recebido_reais.replace(',', '.')) * 100)
+    const normalized = values.valor_recebido_reais.replace(/\./g, '').replace(',', '.')
+    const valorCentavos = Math.round(parseFloat(normalized) * 100)
     const novoStatus = values.tipo_recebimento === 'total' ? 'recebido' : 'parcial'
 
     // Update medicoes
