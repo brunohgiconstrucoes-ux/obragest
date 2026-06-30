@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { format, parseISO, getDaysInMonth } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { useForm, Controller } from 'react-hook-form'
@@ -98,7 +98,7 @@ export function FluxoCaixaPJPage() {
 
   // ── Load lancamentos ───────────────────────────────────────────────────────
 
-  async function loadLancamentos() {
+  const loadLancamentos = useCallback(async () => {
     if (!user) return
     setLoading(true)
     const lastDay = getDaysInMonth(new Date(ano, mes - 1))
@@ -120,11 +120,11 @@ export function FluxoCaixaPJPage() {
       setLancamentos((data as FluxoCaixaComObra[]) ?? [])
     }
     setLoading(false)
-  }
+  }, [user, mes, ano, toast])
 
   useEffect(() => {
     loadLancamentos()
-  }, [user, mes, ano])
+  }, [loadLancamentos])
 
   // ── Marcar como realizado ──────────────────────────────────────────────────
 
