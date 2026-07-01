@@ -146,6 +146,12 @@ export function AvulsoFormPage() {
         nome: values.nome,
         cpf_cnpj: values.cpf_cnpj || null,
         funcao: values.funcao,
+        valor_bruto: null,
+        retencao_inss: null,
+        retencao_iss: null,
+        retencao_irrf: null,
+        numero_nf: null,
+        pdf_url: null,
         valor_diaria: diariaCents,
         quantidade_dias: dias,
         periodo_inicio: values.periodo_inicio,
@@ -178,6 +184,7 @@ export function AvulsoFormPage() {
       valor: totalCents,
       data_lancamento: values.periodo_fim,
       status: 'previsto' as const,
+      data_realizacao: null,
       incluir_contador: false,
       observacao: values.observacao || null,
     })
@@ -365,7 +372,7 @@ export function AvulsoFormPage() {
               <div className="text-sm space-y-2">
                 <div className="flex justify-between">
                   <span style={{ color: 'var(--color-muted)' }}>Valor da Diária</span>
-                  <ValorMonetario centavos={valorDiariaCentavos} />
+                  <ValorMonetario value={valorDiariaCentavos} />
                 </div>
 
                 <div className="flex justify-between">
@@ -378,7 +385,7 @@ export function AvulsoFormPage() {
                   style={{ borderColor: 'var(--color-border)' }}
                 >
                   <span>Total a Pagar</span>
-                  <ValorMonetario centavos={Math.max(0, valorPago)} />
+                  <ValorMonetario value={Math.max(0, valorPago)} />
                 </div>
               </div>
 

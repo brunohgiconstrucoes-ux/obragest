@@ -103,6 +103,7 @@ export function PlanilhaServicosPage() {
       .insert({
         obra_id: obraId!,
         user_id: user!.id,
+        codigo: null,
         descricao: 'Novo item',
         unidade: 'un',
         quantidade_contratada: 1,

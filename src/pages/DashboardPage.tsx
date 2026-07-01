@@ -92,7 +92,7 @@ export function DashboardPage() {
       .reduce((a, f) => a + f.valor, 0)
     setSaldoPF(pfEntradas - pfSaidas)
 
-    setMedicoesPendentes((medicoesRes.data ?? []) as MedicaoComObra[])
+    setMedicoesPendentes((medicoesRes.data ?? []) as unknown as MedicaoComObra[])
     setLoading(false)
   }, [user, toast])
 

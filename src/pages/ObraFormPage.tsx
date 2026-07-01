@@ -113,8 +113,7 @@ export function ObraFormPage() {
     if (!user) return
     setSubmitting(true)
 
-    const payload = {
-      user_id: user.id,
+    const basePayload = {
       nome: data.nome,
       numero_licitacao: data.numero_licitacao || null,
       orgao_contratante: data.orgao_contratante,
@@ -133,8 +132,8 @@ export function ObraFormPage() {
     }
 
     const { error } = isEditing
-      ? await supabase.from('obras').update(payload).eq('id', id!).eq('user_id', user.id)
-      : await supabase.from('obras').insert(payload)
+      ? await supabase.from('obras').update(basePayload).eq('id', id!).eq('user_id', user.id)
+      : await supabase.from('obras').insert({ ...basePayload, user_id: user.id })
 
     setSubmitting(false)
     if (error) {

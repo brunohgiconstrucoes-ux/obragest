@@ -134,6 +134,12 @@ export function RpaFormPage() {
         retencao_inss: inss,
         retencao_iss: iss,
         retencao_irrf: irrf,
+        numero_nf: null,
+        valor_diaria: null,
+        quantidade_dias: null,
+        periodo_inicio: null,
+        periodo_fim: null,
+        pdf_url: null,
         valor_pago: pago,
         data_pagamento: values.data_pagamento,
         status: 'previsto' as const,
@@ -162,6 +168,7 @@ export function RpaFormPage() {
       valor: pago,
       data_lancamento: values.data_pagamento,
       status: 'previsto' as const,
+      data_realizacao: null,
       incluir_contador: true,
       observacao: values.observacao || null,
     })
@@ -313,27 +320,27 @@ export function RpaFormPage() {
               <div className="text-sm space-y-2">
                 <div className="flex justify-between">
                   <span style={{ color: 'var(--color-muted)' }}>Valor Bruto</span>
-                  <ValorMonetario centavos={valorBrutoCentavos} />
+                  <ValorMonetario value={valorBrutoCentavos} />
                 </div>
 
                 {aliquotaInss > 0 && (
                   <div className="flex justify-between">
                     <span style={{ color: 'var(--color-muted)' }}>(-) INSS ({aliquotaInss}%)</span>
-                    <ValorMonetario centavos={retencaoInss} />
+                    <ValorMonetario value={retencaoInss} />
                   </div>
                 )}
 
                 {aliquotaIss > 0 && (
                   <div className="flex justify-between">
                     <span style={{ color: 'var(--color-muted)' }}>(-) ISS ({aliquotaIss}%)</span>
-                    <ValorMonetario centavos={retencaoIss} />
+                    <ValorMonetario value={retencaoIss} />
                   </div>
                 )}
 
                 {aliquotaIrrf > 0 && (
                   <div className="flex justify-between">
                     <span style={{ color: 'var(--color-muted)' }}>(-) IRRF ({aliquotaIrrf}%)</span>
-                    <ValorMonetario centavos={retencaoIrrf} />
+                    <ValorMonetario value={retencaoIrrf} />
                   </div>
                 )}
 
@@ -342,7 +349,7 @@ export function RpaFormPage() {
                   style={{ borderColor: 'var(--color-border)' }}
                 >
                   <span>(-) Total Retenções</span>
-                  <ValorMonetario centavos={totalRetencoes} />
+                  <ValorMonetario value={totalRetencoes} />
                 </div>
 
                 <div
@@ -350,7 +357,7 @@ export function RpaFormPage() {
                   style={{ borderColor: 'var(--color-border)' }}
                 >
                   <span>Valor Líquido</span>
-                  <ValorMonetario centavos={Math.max(0, valorPago)} />
+                  <ValorMonetario value={Math.max(0, valorPago)} />
                 </div>
               </div>
 

@@ -171,7 +171,6 @@ export function MedicaoFormPage() {
     // Step 2: Insert medicao_itens
     const medicaoItensRows = itensAtivos.map(item => {
       const qtd = parseFloat(quantidades[item.planilha_item_id])
-      const valorTotal = Math.round(qtd * item.valor_unitario)
       return {
         medicao_id: medicao.id,
         planilha_item_id: item.planilha_item_id,
@@ -181,7 +180,6 @@ export function MedicaoFormPage() {
         unidade: item.unidade,
         valor_unitario: item.valor_unitario,
         quantidade_executada: qtd,
-        valor_total: valorTotal,
       }
     })
 

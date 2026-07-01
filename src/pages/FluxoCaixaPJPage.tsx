@@ -110,7 +110,7 @@ export function FluxoCaixaPJPage() {
     if (error) {
       toast({ title: 'Erro ao carregar lançamentos', variant: 'destructive' })
     } else {
-      setLancamentos((data as FluxoCaixaComObra[]) ?? [])
+      setLancamentos((data as unknown as FluxoCaixaComObra[]) ?? [])
     }
     setLoading(false)
   }, [user, mes, ano, toast])
