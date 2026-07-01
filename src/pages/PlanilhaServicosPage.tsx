@@ -384,7 +384,7 @@ export function PlanilhaServicosPage() {
                       <td className={tdClass}>
                         <Input
                           type="number"
-                          step="1"
+                          step="0.01"
                           value={editValues.valor_unitario ?? 0}
                           onChange={e =>
                             setEditValues(v => ({

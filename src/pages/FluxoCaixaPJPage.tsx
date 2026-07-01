@@ -172,11 +172,11 @@ export function FluxoCaixaPJPage() {
   // ── Sumário ────────────────────────────────────────────────────────────────
 
   const totalEntradas = lancamentos
-    .filter(l => l.tipo === 'entrada' && l.status === 'realizado')
+    .filter(l => l.tipo === 'entrada')
     .reduce((s, l) => s + l.valor, 0)
 
   const totalSaidas = lancamentos
-    .filter(l => l.tipo === 'saida' && l.status === 'realizado')
+    .filter(l => l.tipo === 'saida')
     .reduce((s, l) => s + l.valor, 0)
 
   const saldoLiquido = totalEntradas - totalSaidas
