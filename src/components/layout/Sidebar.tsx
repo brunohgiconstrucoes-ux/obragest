@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Building2, TrendingUp, User, Package, Settings, LogOut, Moon, Sun } from 'lucide-react'
+import { LayoutDashboard, Building2, TrendingUp, User, Package, Settings, LogOut, Moon, Sun, Warehouse } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useTheme } from '@/hooks/useTheme'
 import { Button } from '@/components/ui/button'
@@ -11,6 +11,7 @@ const navItems = [
   { icon: Building2, label: 'Obras', href: '/obras' },
   { icon: TrendingUp, label: 'Fluxo PJ', href: '/fluxo/pj' },
   { icon: User, label: 'Fluxo PF', href: '/fluxo/pf' },
+  { icon: Warehouse, label: 'Almoxarifado', href: '/almoxarifado' },
   { icon: Package, label: 'Contador', href: '/contador' },
   { icon: Settings, label: 'Configurações', href: '/configuracoes' },
 ]

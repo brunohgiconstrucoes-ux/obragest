@@ -20,6 +20,7 @@ import { FluxoCaixaPJPage } from '@/pages/FluxoCaixaPJPage'
 import { FluxoCaixaPFPage } from '@/pages/FluxoCaixaPFPage'
 import { ContadorPage } from '@/pages/ContadorPage'
 import { ConfiguracoesPage } from '@/pages/ConfiguracoesPage'
+import { AlmoxarifadoPage } from '@/pages/AlmoxarifadoPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -65,6 +66,7 @@ export default function App() {
           <Route path="/fluxo/pf" element={<FluxoCaixaPFPage />} />
           <Route path="/contador" element={<ContadorPage />} />
           <Route path="/configuracoes" element={<ConfiguracoesPage />} />
+          <Route path="/almoxarifado" element={<AlmoxarifadoPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

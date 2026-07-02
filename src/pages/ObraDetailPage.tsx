@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { ArrowLeft, Edit, Plus, FileText, ClipboardList, Wrench, Users, TrendingUp, ExternalLink } from 'lucide-react'
+import { ArrowLeft, Edit, Plus, FileText, ClipboardList, Wrench, Users, TrendingUp, ExternalLink, Package } from 'lucide-react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -499,7 +499,7 @@ function NfDialog({ obraId, onSaved }: { obraId: string; onSaved: () => void }) 
 
 // ── ObraDetailPage ────────────────────────────────────────────────────────────
 
-const TABS = ['contrato', 'planilha', 'medicoes', 'materiais', 'mao-de-obra', 'fluxo'] as const
+const TABS = ['contrato', 'planilha', 'medicoes', 'materiais', 'mao-de-obra', 'fluxo', 'estoque'] as const
 type TabValue = typeof TABS[number]
 
 export function ObraDetailPage() {
@@ -533,6 +533,9 @@ export function ObraDetailPage() {
 
   const [fluxo, setFluxo] = useState<FluxoCaixa[]>([])
   const [loadingFluxo, setLoadingFluxo] = useState(false)
+
+  const [estoqueObra, setEstoqueObra] = useState<{ nome: string; unidade: string; saldo: number }[]>([])
+  const [loadingEstoque, setLoadingEstoque] = useState(false)
 
   // ── Loaders ──
   async function loadObra() {
@@ -619,6 +622,22 @@ export function ObraDetailPage() {
     setLoadingFluxo(false)
   }
 
+  async function loadEstoqueObra() {
+    if (!id || !user) return
+    setLoadingEstoque(true)
+    const { data } = await supabase
+      .from('vw_saldo_estoque')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('obra_id', id)
+    setEstoqueObra(
+      (data ?? [])
+        .filter(s => s.saldo > 0)
+        .map(s => ({ nome: s.nome, unidade: s.unidade, saldo: s.saldo }))
+    )
+    setLoadingEstoque(false)
+  }
+
   // ── Effects ──
   useEffect(() => {
     loadObra()
@@ -632,6 +651,7 @@ export function ObraDetailPage() {
     else if (activeTab === 'materiais') loadMateriais()
     else if (activeTab === 'mao-de-obra') loadMaoDeObra()
     else if (activeTab === 'fluxo') loadFluxo()
+    else if (activeTab === 'estoque') loadEstoqueObra()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, obra])
 
@@ -709,6 +729,10 @@ export function ObraDetailPage() {
           <TabsTrigger value="fluxo" className="data-[state=active]:bg-[var(--color-surface-2)] data-[state=active]:text-[var(--color-primary)] text-[var(--color-muted)]">
             <TrendingUp className="w-3.5 h-3.5 mr-1.5" />
             Fluxo
+          </TabsTrigger>
+          <TabsTrigger value="estoque" className="data-[state=active]:bg-[var(--color-surface-2)] data-[state=active]:text-[var(--color-primary)] text-[var(--color-muted)]">
+            <Package className="w-3.5 h-3.5 mr-1.5" />
+            Estoque
           </TabsTrigger>
         </TabsList>
 
@@ -992,6 +1016,47 @@ export function ObraDetailPage() {
                       <td className="px-3 py-2 text-center"><FluxoTipoBadge tipo={f.tipo} /></td>
                       <td className="px-3 py-2 text-right"><ValorMonetario value={f.valor} /></td>
                       <td className="px-3 py-2 text-center"><LancStatusBadge status={f.status} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ── Aba Estoque ── */}
+        <TabsContent value="estoque" className="mt-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-[var(--color-text)]">Estoque alocado nesta obra</h2>
+            <Button asChild size="sm" variant="outline" className="border-[var(--color-border)] text-[var(--color-text)] hover:bg-[var(--color-surface-2)]">
+              <a href="/almoxarifado">Ver almoxarifado central</a>
+            </Button>
+          </div>
+          {loadingEstoque ? (
+            <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-10 rounded bg-[var(--color-surface)] animate-pulse" />)}</div>
+          ) : estoqueObra.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-[var(--color-muted)] text-sm">Nenhum material transferido para esta obra ainda.</p>
+              <p className="text-[var(--color-muted)] text-xs mt-1">Use "Transferir para obra" no Almoxarifado para alocar materiais.</p>
+            </div>
+          ) : (
+            <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--color-border)] bg-[var(--color-surface-2)]">
+                    <th className="text-left px-4 py-3 text-xs text-[var(--color-muted)] font-medium">Material</th>
+                    <th className="text-center px-4 py-3 text-xs text-[var(--color-muted)] font-medium">Unid.</th>
+                    <th className="text-right px-4 py-3 text-xs text-[var(--color-muted)] font-medium">Saldo na Obra</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {estoqueObra.map((item, i) => (
+                    <tr key={i} className="border-b border-[var(--color-border)] last:border-0 hover:bg-[var(--color-surface-2)]">
+                      <td className="px-4 py-3 font-medium">{item.nome}</td>
+                      <td className="px-4 py-3 text-center text-[var(--color-muted)]">{item.unidade}</td>
+                      <td className="px-4 py-3 text-right font-mono text-[var(--color-success)] font-medium">
+                        {item.saldo.toLocaleString('pt-BR', { maximumFractionDigits: 3 })}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
