@@ -364,7 +364,6 @@ function NfDialog({ obraId, onSaved }: { obraId: string; onSaved: () => void }) 
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [digitalizando, setDigitalizando] = useState(false)
-  const fileRef = useState<HTMLInputElement | null>(null)
 
   const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<NfFormValues>({
     resolver: zodResolver(nfSchema),

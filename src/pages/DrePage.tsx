@@ -4,14 +4,14 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   LineChart, Line, ReferenceLine,
 } from 'recharts'
-import { format, subMonths, startOfMonth, endOfMonth, addMonths, parseISO } from 'date-fns'
+import { format, subMonths, startOfMonth, addMonths, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { TrendingUp, TrendingDown, DollarSign, Target } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ValorMonetario } from '@/components/shared/ValorMonetario'
-import type { FluxoCaixa, Obra, VwObraKpis } from '@/types'
+import type { FluxoCaixa, VwObraKpis } from '@/types'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

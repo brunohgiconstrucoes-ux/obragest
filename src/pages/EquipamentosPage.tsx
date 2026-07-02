@@ -93,7 +93,7 @@ export function EquipamentosPage() {
       supabase.from('alocacoes_equipamento').select('*, obras(nome)').eq('user_id', user.id).is('data_fim', null),
       supabase.from('obras').select('id, nome').eq('user_id', user.id).eq('status', 'em_andamento').order('nome'),
     ])
-    const alocacoes = (alocRes.data ?? []) as AlocacaoComObra[]
+    const alocacoes = (alocRes.data ?? []) as unknown as AlocacaoComObra[]
     const alocMap = new Map(alocacoes.map(a => [a.equipamento_id, a]))
     setEquipamentos(
       (equipRes.data ?? []).map(e => ({ ...e, alocacao_atual: alocMap.get(e.id) ?? null }))

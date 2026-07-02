@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { format, parseISO } from 'date-fns'
-import { ptBR } from 'date-fns/locale'
-import { Package, Plus, ArrowRightLeft, AlertTriangle, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react'
+import { Package, Plus, ArrowRightLeft, AlertTriangle, ArrowDownToLine } from 'lucide-react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -15,7 +14,6 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ValorMonetario } from '@/components/shared/ValorMonetario'
 import type { EstoqueItem, VwSaldoEstoque, EstoqueCategoria, Obra } from '@/types'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
