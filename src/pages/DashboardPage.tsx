@@ -2,10 +2,11 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { Building2, TrendingUp, TrendingDown, Plus, ArrowRight } from 'lucide-react'
+import { Building2, TrendingUp, TrendingDown, Plus, ArrowRight, AlertTriangle, Clock } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { useToast } from '@/hooks/use-toast'
+import { useAlertas } from '@/hooks/useAlertas'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
@@ -22,6 +23,10 @@ type MedicaoComObra = Medicao & {
 export function DashboardPage() {
   const { user } = useAuth()
   const { toast } = useToast()
+
+  const { alertas } = useAlertas()
+  const criticos = alertas.filter(a => a.severidade === 'critico')
+  const atencao = alertas.filter(a => a.severidade === 'atencao')
 
   const [loading, setLoading] = useState(true)
   const [obras, setObras] = useState<ObraComKpis[]>([])
@@ -111,6 +116,43 @@ export function DashboardPage() {
   return (
     <div className="space-y-8">
       <h1 className="text-2xl font-bold text-[var(--color-text)]">Dashboard</h1>
+
+      {/* Alertas resumo */}
+      {alertas.length > 0 && (
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base font-semibold text-[var(--color-text)] flex items-center gap-2">
+              {criticos.length > 0
+                ? <AlertTriangle className="w-4 h-4 text-[var(--color-danger)]" />
+                : <Clock className="w-4 h-4 text-[var(--color-warning)]" />}
+              {alertas.length} alerta{alertas.length > 1 ? 's' : ''} ativo{alertas.length > 1 ? 's' : ''}
+            </h2>
+            <Button asChild variant="outline" size="sm" className="border-[var(--color-border)] text-[var(--color-text)]">
+              <Link to="/alertas">Ver todos</Link>
+            </Button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {criticos.length > 0 && (
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-[var(--color-danger)]/5 border border-[var(--color-danger)]/20">
+                <AlertTriangle className="w-5 h-5 text-[var(--color-danger)] shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-[var(--color-danger)]">{criticos.length} crítico{criticos.length > 1 ? 's' : ''}</p>
+                  <p className="text-xs text-[var(--color-muted)]">{criticos[0].titulo}</p>
+                </div>
+              </div>
+            )}
+            {atencao.length > 0 && (
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-[var(--color-warning)]/5 border border-[var(--color-warning)]/20">
+                <Clock className="w-5 h-5 text-[var(--color-warning)] shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-[var(--color-warning)]">{atencao.length} atenção</p>
+                  <p className="text-xs text-[var(--color-muted)]">{atencao[0].titulo}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* Saldo Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

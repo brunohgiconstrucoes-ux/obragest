@@ -1,7 +1,8 @@
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Building2, TrendingUp, User, Package, Settings, LogOut, Moon, Sun, Warehouse } from 'lucide-react'
+import { LayoutDashboard, Building2, TrendingUp, User, Package, Settings, LogOut, Moon, Sun, Warehouse, Wrench, Bell } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useTheme } from '@/hooks/useTheme'
+import { useAlertas } from '@/hooks/useAlertas'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
@@ -12,6 +13,8 @@ const navItems = [
   { icon: TrendingUp, label: 'Fluxo PJ', href: '/fluxo/pj' },
   { icon: User, label: 'Fluxo PF', href: '/fluxo/pf' },
   { icon: Warehouse, label: 'Almoxarifado', href: '/almoxarifado' },
+  { icon: Wrench, label: 'Equipamentos', href: '/equipamentos' },
+  { icon: Bell, label: 'Alertas', href: '/alertas', badge: true },
   { icon: Package, label: 'Contador', href: '/contador' },
   { icon: Settings, label: 'Configurações', href: '/configuracoes' },
 ]
@@ -20,6 +23,9 @@ export function Sidebar() {
   const { perfil, signOut } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const location = useLocation()
+  const { alertas } = useAlertas()
+  const totalAlertas = alertas.length
+  const temCritico = alertas.some(a => a.severidade === 'critico')
 
   const displayName = perfil?.razao_social ?? perfil?.nome_completo ?? 'Usuário'
 
@@ -37,7 +43,7 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-1">
-        {navItems.map(({ icon: Icon, label, href }) => {
+        {navItems.map(({ icon: Icon, label, href, badge }) => {
           const active = location.pathname === href || (href !== '/' && location.pathname.startsWith(href))
           return (
             <Link
@@ -51,7 +57,14 @@ export function Sidebar() {
               )}
             >
               <Icon className="w-4 h-4" />
-              {label}
+              <span className="flex-1">{label}</span>
+              {badge && totalAlertas > 0 && (
+                <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center ${
+                  temCritico ? 'bg-[var(--color-danger)] text-white' : 'bg-[var(--color-warning)] text-black'
+                }`}>
+                  {totalAlertas}
+                </span>
+              )}
             </Link>
           )
         })}

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { ArrowLeft, Edit, Plus, FileText, ClipboardList, Wrench, Users, TrendingUp, ExternalLink, Package } from 'lucide-react'
+import { ArrowLeft, Edit, Plus, FileText, ClipboardList, Wrench, Users, TrendingUp, ExternalLink, Package, Gauge } from 'lucide-react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -499,7 +499,7 @@ function NfDialog({ obraId, onSaved }: { obraId: string; onSaved: () => void }) 
 
 // ── ObraDetailPage ────────────────────────────────────────────────────────────
 
-const TABS = ['contrato', 'planilha', 'medicoes', 'materiais', 'mao-de-obra', 'fluxo', 'estoque'] as const
+const TABS = ['contrato', 'planilha', 'medicoes', 'materiais', 'mao-de-obra', 'fluxo', 'estoque', 'equipamentos'] as const
 type TabValue = typeof TABS[number]
 
 export function ObraDetailPage() {
@@ -536,6 +536,9 @@ export function ObraDetailPage() {
 
   const [estoqueObra, setEstoqueObra] = useState<{ nome: string; unidade: string; saldo: number }[]>([])
   const [loadingEstoque, setLoadingEstoque] = useState(false)
+
+  const [equipamentosObra, setEquipamentosObra] = useState<{ nome: string; tipo: string; data_inicio: string; custo_diaria: number; custo_diaria_override: number | null; dias: number }[]>([])
+  const [loadingEquipamentos, setLoadingEquipamentos] = useState(false)
 
   // ── Loaders ──
   async function loadObra() {
@@ -622,6 +625,29 @@ export function ObraDetailPage() {
     setLoadingFluxo(false)
   }
 
+  async function loadEquipamentosObra() {
+    if (!id || !user) return
+    setLoadingEquipamentos(true)
+    const { data } = await supabase
+      .from('alocacoes_equipamento')
+      .select('*, equipamentos(nome, tipo, custo_diaria)')
+      .eq('user_id', user.id)
+      .eq('obra_id', id)
+      .is('data_fim', null)
+    const { differenceInDays, parseISO } = await import('date-fns')
+    setEquipamentosObra(
+      (data ?? []).map((a: any) => ({
+        nome: a.equipamentos?.nome ?? '—',
+        tipo: a.equipamentos?.tipo ?? '—',
+        data_inicio: a.data_inicio,
+        custo_diaria: a.equipamentos?.custo_diaria ?? 0,
+        custo_diaria_override: a.custo_diaria_override ?? null,
+        dias: differenceInDays(new Date(), parseISO(a.data_inicio)) + 1,
+      }))
+    )
+    setLoadingEquipamentos(false)
+  }
+
   async function loadEstoqueObra() {
     if (!id || !user) return
     setLoadingEstoque(true)
@@ -652,6 +678,7 @@ export function ObraDetailPage() {
     else if (activeTab === 'mao-de-obra') loadMaoDeObra()
     else if (activeTab === 'fluxo') loadFluxo()
     else if (activeTab === 'estoque') loadEstoqueObra()
+    else if (activeTab === 'equipamentos') loadEquipamentosObra()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, obra])
 
@@ -733,6 +760,10 @@ export function ObraDetailPage() {
           <TabsTrigger value="estoque" className="data-[state=active]:bg-[var(--color-surface-2)] data-[state=active]:text-[var(--color-primary)] text-[var(--color-muted)]">
             <Package className="w-3.5 h-3.5 mr-1.5" />
             Estoque
+          </TabsTrigger>
+          <TabsTrigger value="equipamentos" className="data-[state=active]:bg-[var(--color-surface-2)] data-[state=active]:text-[var(--color-primary)] text-[var(--color-muted)]">
+            <Gauge className="w-3.5 h-3.5 mr-1.5" />
+            Equipamentos
           </TabsTrigger>
         </TabsList>
 
@@ -1064,6 +1095,53 @@ export function ObraDetailPage() {
             </div>
           )}
         </TabsContent>
+        {/* ── Aba Equipamentos ── */}
+        <TabsContent value="equipamentos" className="mt-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-[var(--color-text)]">Equipamentos alocados nesta obra</h2>
+            <Button asChild size="sm" variant="outline" className="border-[var(--color-border)] text-[var(--color-text)] hover:bg-[var(--color-surface-2)]">
+              <a href="/equipamentos">Ver todos os equipamentos</a>
+            </Button>
+          </div>
+          {loadingEquipamentos ? (
+            <div className="space-y-2">{[1,2].map(i => <div key={i} className="h-10 rounded bg-[var(--color-surface)] animate-pulse" />)}</div>
+          ) : equipamentosObra.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-[var(--color-muted)] text-sm">Nenhum equipamento alocado nesta obra.</p>
+              <p className="text-[var(--color-muted)] text-xs mt-1">Use "Alocar para obra" em Equipamentos para registrar máquinas e ferramentas.</p>
+            </div>
+          ) : (
+            <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--color-border)] bg-[var(--color-surface-2)]">
+                    <th className="text-left px-4 py-3 text-xs text-[var(--color-muted)] font-medium">Equipamento</th>
+                    <th className="text-left px-4 py-3 text-xs text-[var(--color-muted)] font-medium">Tipo</th>
+                    <th className="text-right px-4 py-3 text-xs text-[var(--color-muted)] font-medium">Dias</th>
+                    <th className="text-right px-4 py-3 text-xs text-[var(--color-muted)] font-medium">Custo/dia</th>
+                    <th className="text-right px-4 py-3 text-xs text-[var(--color-muted)] font-medium">Custo acumulado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {equipamentosObra.map((e, i) => {
+                    const diaria = e.custo_diaria_override ?? e.custo_diaria
+                    const total = diaria * e.dias
+                    return (
+                      <tr key={i} className="border-b border-[var(--color-border)] last:border-0 hover:bg-[var(--color-surface-2)]">
+                        <td className="px-4 py-3 font-medium">{e.nome}</td>
+                        <td className="px-4 py-3 text-[var(--color-muted)] capitalize">{e.tipo}</td>
+                        <td className="px-4 py-3 text-right text-[var(--color-muted)]">{e.dias}</td>
+                        <td className="px-4 py-3 text-right"><ValorMonetario value={diaria} /></td>
+                        <td className="px-4 py-3 text-right font-medium text-[var(--color-warning)]"><ValorMonetario value={total} /></td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </TabsContent>
+
       </Tabs>
     </div>
   )
