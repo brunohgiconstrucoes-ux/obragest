@@ -400,13 +400,111 @@ export type ItemContador = {
   incluir: boolean
 }
 
+// ── Almoxarifado ─────────────────────────────────────────────────────────────
+
+export type EstoqueCategoria =
+  | 'cimento'
+  | 'aco'
+  | 'madeira'
+  | 'eletrica'
+  | 'hidraulica'
+  | 'epi'
+  | 'outros'
+
+export type MovimentacaoTipo =
+  | 'entrada'
+  | 'saida'
+  | 'transferencia_entrada'
+  | 'transferencia_saida'
+  | 'ajuste'
+
+export type EstoqueItem = {
+  id: string
+  user_id: string
+  nome: string
+  unidade: string
+  categoria: EstoqueCategoria
+  estoque_minimo: number
+  created_at: string
+}
+
+export type MovimentacaoEstoque = {
+  id: string
+  user_id: string
+  item_id: string
+  obra_id: string | null
+  tipo: MovimentacaoTipo
+  quantidade: number
+  custo_unitario: number // centavos (bigint)
+  data: string
+  observacao: string | null
+  created_at: string
+}
+
+export type VwSaldoEstoque = {
+  item_id: string
+  user_id: string
+  nome: string
+  unidade: string
+  categoria: EstoqueCategoria
+  estoque_minimo: number
+  obra_id: string | null
+  saldo: number
+}
+
+// ── Equipamentos ──────────────────────────────────────────────────────────────
+
+export type EquipamentoTipo = 'proprio' | 'alugado' | 'terceiro'
+
+export type EquipamentoStatus = 'disponivel' | 'alocado' | 'manutencao'
+
+export type Equipamento = {
+  id: string
+  user_id: string
+  nome: string
+  tipo: EquipamentoTipo
+  numero_serie: string | null
+  valor_aquisicao: number // centavos (bigint)
+  custo_diaria: number // centavos (bigint)
+  proxima_manutencao: string | null
+  status: EquipamentoStatus
+  created_at: string
+}
+
+export type AlocacaoEquipamento = {
+  id: string
+  user_id: string
+  equipamento_id: string
+  obra_id: string
+  data_inicio: string
+  data_fim: string | null
+  custo_diaria_override: number | null // centavos (bigint)
+  observacao: string | null
+  created_at: string
+}
+
+// ── Alertas ───────────────────────────────────────────────────────────────────
+
+export type AlertaTipo =
+  | 'prazo_critico'
+  | 'prazo_atencao'
+  | 'orcamento_estourado'
+  | 'orcamento_proximo'
+  | 'estoque_minimo'
+  | 'medicao_atrasada'
+  | 'manutencao_vencida'
+
+export type AlertaSeveridade = 'critico' | 'atencao'
+
 export type Alerta = {
   id: string
-  tipo: 'nf_pendente' | 'medicao_aberta' | 'conta_vencendo' | 'rpa_pendente'
-  mensagem: string
+  tipo: AlertaTipo
+  severidade: AlertaSeveridade
+  titulo: string
+  descricao: string
   obra_id: string | null
-  link_acao: string
-  criado_em: string
+  obra_nome: string | null
+  link: string
 }
 
 export type Database = {
@@ -466,6 +564,30 @@ export type Database = {
         Update: Partial<Omit<ExportacaoContador, 'id' | 'user_id' | 'created_at'>>
         Relationships: []
       }
+      estoque_itens: {
+        Row: EstoqueItem
+        Insert: Omit<EstoqueItem, 'id' | 'created_at'>
+        Update: Partial<Omit<EstoqueItem, 'id' | 'user_id' | 'created_at'>>
+        Relationships: []
+      }
+      movimentacoes_estoque: {
+        Row: MovimentacaoEstoque
+        Insert: Omit<MovimentacaoEstoque, 'id' | 'created_at'>
+        Update: Partial<Omit<MovimentacaoEstoque, 'id' | 'user_id' | 'created_at'>>
+        Relationships: []
+      }
+      equipamentos: {
+        Row: Equipamento
+        Insert: Omit<Equipamento, 'id' | 'created_at'>
+        Update: Partial<Omit<Equipamento, 'id' | 'user_id' | 'created_at'>>
+        Relationships: []
+      }
+      alocacoes_equipamento: {
+        Row: AlocacaoEquipamento
+        Insert: Omit<AlocacaoEquipamento, 'id' | 'created_at'>
+        Update: Partial<Omit<AlocacaoEquipamento, 'id' | 'user_id' | 'created_at'>>
+        Relationships: []
+      }
     }
     Views: {
       vw_planilha_saldo: {
@@ -474,6 +596,10 @@ export type Database = {
       }
       vw_obra_kpis: {
         Row: VwObraKpis
+        Relationships: []
+      }
+      vw_saldo_estoque: {
+        Row: VwSaldoEstoque
         Relationships: []
       }
     }
