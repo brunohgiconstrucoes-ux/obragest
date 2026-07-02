@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { ArrowLeft, Edit, Plus, FileText, ClipboardList, Wrench, Users, TrendingUp, ExternalLink, Package, Gauge } from 'lucide-react'
+import { ArrowLeft, Edit, Plus, FileText, ClipboardList, Wrench, Users, TrendingUp, ExternalLink, Package, Gauge, Sparkles, Upload } from 'lucide-react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -20,6 +20,7 @@ import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { ValorMonetario } from '@/components/shared/ValorMonetario'
+import { extrairDadosNf } from '@/lib/gemini'
 import type {
   Obra,
   Medicao,
@@ -362,11 +363,33 @@ function NfDialog({ obraId, onSaved }: { obraId: string; onSaved: () => void }) 
   const { toast } = useToast()
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [digitalizando, setDigitalizando] = useState(false)
+  const fileRef = useState<HTMLInputElement | null>(null)
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<NfFormValues>({
+  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<NfFormValues>({
     resolver: zodResolver(nfSchema),
     defaultValues: { data_pagamento: todayStr() },
   })
+
+  async function handleDigitalizar(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setDigitalizando(true)
+    try {
+      const dados = await extrairDadosNf(file)
+      if (dados.nome) setValue('nome', dados.nome)
+      if (dados.cpf_cnpj) setValue('cpf_cnpj', dados.cpf_cnpj)
+      if (dados.numero_nf) setValue('numero_nf', dados.numero_nf)
+      if (dados.valor_pago_reais) setValue('valor_pago_reais', dados.valor_pago_reais)
+      if (dados.data_pagamento) setValue('data_pagamento', dados.data_pagamento)
+      toast({ description: 'Dados extraídos! Confira e ajuste se necessário.' })
+    } catch {
+      toast({ description: 'Não foi possível extrair os dados. Preencha manualmente.', variant: 'destructive' })
+    }
+    setDigitalizando(false)
+    // Limpa o input para permitir re-upload do mesmo arquivo
+    e.target.value = ''
+  }
 
   async function onSubmit(values: NfFormValues) {
     setSaving(true)
@@ -449,7 +472,28 @@ function NfDialog({ obraId, onSaved }: { obraId: string; onSaved: () => void }) 
         <DialogHeader>
           <DialogTitle className="text-[var(--color-text)]">Lançar Nota Fiscal</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
+        {/* Botão Digitalizar NF com IA */}
+        <div className="mt-2">
+          <label className={`flex items-center justify-center gap-2 w-full py-2.5 rounded-lg border-2 border-dashed cursor-pointer transition-colors text-sm font-medium
+            ${digitalizando
+              ? 'border-[var(--color-primary)]/40 text-[var(--color-muted)] cursor-not-allowed'
+              : 'border-[var(--color-primary)]/40 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/5'
+            }`}>
+            <input
+              type="file"
+              accept="image/*,application/pdf"
+              className="hidden"
+              disabled={digitalizando}
+              onChange={handleDigitalizar}
+            />
+            {digitalizando
+              ? <><Sparkles className="w-4 h-4 animate-pulse" /> Analisando NF com IA...</>
+              : <><Upload className="w-4 h-4" /> Digitalizar NF com IA (foto ou PDF)</>
+            }
+          </label>
+          <p className="text-xs text-[var(--color-muted)] text-center mt-1">Os campos serão preenchidos automaticamente</p>
+        </div>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-1">
           <div>
             <Label className="text-[var(--color-muted)] text-xs">Nome / Razão Social *</Label>
             <Input {...register('nome')} className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]" />
