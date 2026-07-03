@@ -180,7 +180,16 @@ export function ConfiguracoesPage() {
   }
 
   async function handleLogoRemove() {
-    if (!user) return
+    if (!user || !logoPreview) return
+    try {
+      const url = new URL(logoPreview)
+      const pathParts = url.pathname.split('/logos/')
+      if (pathParts[1]) {
+        await supabase.storage.from('logos').remove([pathParts[1]])
+      }
+    } catch {
+      // se falhar na remoção do storage, ainda limpa a URL no banco
+    }
     await supabase.from('perfis').update({ logo_url: null }).eq('id', user.id)
     setLogoPreview(null)
     toast({ description: 'Logo removido.' })
