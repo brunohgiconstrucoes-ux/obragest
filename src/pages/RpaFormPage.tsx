@@ -99,13 +99,18 @@ export function RpaFormPage() {
   // ── Derived calculations ──
   const valorBrutoCentavos = parseCentavos(valorBrutoStr ?? '')
 
-  const aliquotaInss = obra?.aliquota_inss ?? 0
-  const aliquotaIss = obra?.aliquota_iss ?? 0
-  const aliquotaIrrf = obra?.aliquota_irrf ?? 0
+  const inssAliq = (obra?.aliquota_inss ?? 0) || (perfil?.aliquota_inss ?? 11)
+  const issAliq = (obra?.aliquota_iss ?? 0) || (perfil?.aliquota_iss ?? 2)
+  const irrfAliq = (obra?.aliquota_irrf ?? 0) || (perfil?.aliquota_irrf ?? 1.5)
 
-  const retencaoInss = Math.round(valorBrutoCentavos * aliquotaInss / 100)
-  const retencaoIss = Math.round(valorBrutoCentavos * aliquotaIss / 100)
-  const retencaoIrrf = Math.round(valorBrutoCentavos * aliquotaIrrf / 100)
+  // keep legacy names for onSubmit compatibility
+  const aliquotaInss = inssAliq
+  const aliquotaIss = issAliq
+  const aliquotaIrrf = irrfAliq
+
+  const retencaoInss = Math.round(valorBrutoCentavos * inssAliq / 100)
+  const retencaoIss = Math.round(valorBrutoCentavos * issAliq / 100)
+  const retencaoIrrf = Math.round(valorBrutoCentavos * irrfAliq / 100)
   const totalRetencoes = retencaoInss + retencaoIss + retencaoIrrf
   const valorPago = valorBrutoCentavos - totalRetencoes
 
@@ -313,59 +318,37 @@ export function RpaFormPage() {
 
         {/* ── Right: resumo ── */}
         <div className="lg:col-span-1">
-          <Card style={{ borderColor: 'var(--color-border)' }}>
-            <CardContent className="pt-5 space-y-3">
-              <p className="font-semibold text-sm">Resumo de Cálculo</p>
-
-              <div className="text-sm space-y-2">
-                <div className="flex justify-between">
-                  <span style={{ color: 'var(--color-muted)' }}>Valor Bruto</span>
-                  <ValorMonetario value={valorBrutoCentavos} />
-                </div>
-
-                {aliquotaInss > 0 && (
+          {valorBrutoCentavos > 0 && (
+            <Card className="bg-[var(--color-surface-2)] border-[var(--color-border)]">
+              <CardContent className="p-4">
+                <p className="text-xs font-semibold text-[var(--color-muted)] uppercase tracking-wide mb-3">Demonstrativo de pagamento</p>
+                <div className="space-y-1.5 text-sm">
                   <div className="flex justify-between">
-                    <span style={{ color: 'var(--color-muted)' }}>(-) INSS ({aliquotaInss}%)</span>
-                    <ValorMonetario value={retencaoInss} />
+                    <span className="text-[var(--color-muted)]">Valor bruto</span>
+                    <ValorMonetario value={valorBrutoCentavos} className="text-[var(--color-text)]" />
                   </div>
-                )}
-
-                {aliquotaIss > 0 && (
-                  <div className="flex justify-between">
-                    <span style={{ color: 'var(--color-muted)' }}>(-) ISS ({aliquotaIss}%)</span>
-                    <ValorMonetario value={retencaoIss} />
+                  <div className="border-t border-[var(--color-border)] pt-1.5 space-y-1.5">
+                    <div className="flex justify-between text-[var(--color-danger)]">
+                      <span>(−) INSS {inssAliq}%</span>
+                      <ValorMonetario value={retencaoInss} className="" />
+                    </div>
+                    <div className="flex justify-between text-[var(--color-danger)]">
+                      <span>(−) ISS {issAliq}%</span>
+                      <ValorMonetario value={retencaoIss} className="" />
+                    </div>
+                    <div className="flex justify-between text-[var(--color-danger)]">
+                      <span>(−) IRRF {irrfAliq}%</span>
+                      <ValorMonetario value={retencaoIrrf} className="" />
+                    </div>
                   </div>
-                )}
-
-                {aliquotaIrrf > 0 && (
-                  <div className="flex justify-between">
-                    <span style={{ color: 'var(--color-muted)' }}>(-) IRRF ({aliquotaIrrf}%)</span>
-                    <ValorMonetario value={retencaoIrrf} />
+                  <div className="border-t border-[var(--color-border)] pt-2 flex justify-between items-center">
+                    <span className="font-bold text-[var(--color-text)]">Valor líquido a pagar</span>
+                    <ValorMonetario value={Math.max(0, valorPago)} className="text-xl font-bold text-[var(--color-success)]" />
                   </div>
-                )}
-
-                <div
-                  className="flex justify-between pt-2 mt-2 font-semibold border-t"
-                  style={{ borderColor: 'var(--color-border)' }}
-                >
-                  <span>(-) Total Retenções</span>
-                  <ValorMonetario value={totalRetencoes} />
                 </div>
-
-                <div
-                  className="flex justify-between pt-2 mt-1 font-bold text-base border-t"
-                  style={{ borderColor: 'var(--color-border)' }}
-                >
-                  <span>Valor Líquido</span>
-                  <ValorMonetario value={Math.max(0, valorPago)} />
-                </div>
-              </div>
-
-              <p className="text-xs pt-2" style={{ color: 'var(--color-muted)' }}>
-                Alíquotas da obra: INSS {aliquotaInss}% / ISS {aliquotaIss}% / IRRF {aliquotaIrrf}%
-              </p>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
 
           <div className="mt-4 flex flex-col gap-3">
             <Button type="submit" disabled={saving} className="w-full">

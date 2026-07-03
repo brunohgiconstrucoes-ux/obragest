@@ -273,9 +273,15 @@ export function AvulsoFormPage() {
             <Input
               id="funcao"
               {...register('funcao')}
-              placeholder="Ex: Diarista, Servente..."
+              list="funcoes-sugeridas"
+              placeholder="Ex: Pedreiro"
               className="mt-1"
             />
+            <datalist id="funcoes-sugeridas">
+              {['Pedreiro', 'Servente', 'Eletricista', 'Encanador', 'Pintor', 'Carpinteiro', 'Armador', 'Mestre de obras'].map(f => (
+                <option key={f} value={f} />
+              ))}
+            </datalist>
             {errors.funcao && (
               <p className="text-xs mt-1" style={{ color: 'var(--color-danger)' }}>
                 {errors.funcao.message}
@@ -365,33 +371,24 @@ export function AvulsoFormPage() {
 
         {/* ── Right: resumo ── */}
         <div className="lg:col-span-1">
-          <Card style={{ borderColor: 'var(--color-border)' }}>
-            <CardContent className="pt-5 space-y-3">
-              <p className="font-semibold text-sm">Resumo de Cálculo</p>
-
-              <div className="text-sm space-y-2">
-                <div className="flex justify-between">
-                  <span style={{ color: 'var(--color-muted)' }}>Valor da Diária</span>
-                  <ValorMonetario value={valorDiariaCentavos} />
-                </div>
-
-                <div className="flex justify-between">
-                  <span style={{ color: 'var(--color-muted)' }}>× Número de Dias</span>
-                  <span>{quantidadeDias}</span>
-                </div>
-
-                <div
-                  className="flex justify-between pt-2 font-bold text-base border-t"
-                  style={{ borderColor: 'var(--color-border)' }}
-                >
-                  <span>Total a Pagar</span>
-                  <ValorMonetario value={Math.max(0, valorPago)} />
-                </div>
+          <Card className="bg-[var(--color-surface-2)] border-[var(--color-border)]">
+            <CardContent className="p-4 space-y-3">
+              <p className="text-xs font-semibold text-[var(--color-muted)] uppercase tracking-wide">Resumo do pagamento</p>
+              <div className="flex justify-between text-sm">
+                <span className="text-[var(--color-muted)]">Valor diária</span>
+                <ValorMonetario value={valorDiariaCentavos} className="text-[var(--color-text)]" />
               </div>
-
-              <p className="text-xs pt-2" style={{ color: 'var(--color-muted)' }}>
-                Avulso não possui retenções. Não incluído no pacote do contador por padrão.
-              </p>
+              <div className="flex justify-between text-sm">
+                <span className="text-[var(--color-muted)]">Nº de dias</span>
+                <span className="text-[var(--color-text)]">{quantidadeDias}</span>
+              </div>
+              <div className="border-t border-[var(--color-border)] pt-3">
+                <div className="flex justify-between items-center">
+                  <span className="font-semibold text-[var(--color-text)]">Total a pagar</span>
+                  <ValorMonetario value={Math.max(0, valorPago)} className="text-2xl font-bold text-[var(--color-success)]" />
+                </div>
+                <p className="text-xs text-[var(--color-muted)] mt-1">Sem retenções (avulso/diarista)</p>
+              </div>
             </CardContent>
           </Card>
 
