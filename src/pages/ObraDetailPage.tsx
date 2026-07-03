@@ -54,6 +54,14 @@ const materialSchema = z.object({
 
 type MaterialFormValues = z.infer<typeof materialSchema>
 
+const quickMaterialSchema = z.object({
+  fornecedor: z.string().min(1, 'Obrigatório'),
+  item: z.string().min(1, 'Obrigatório'),
+  valor_total_reais: z.coerce.number().positive('Obrigatório'),
+  data_compra: z.string().min(1, 'Obrigatório'),
+})
+type QuickMaterialValues = z.infer<typeof quickMaterialSchema>
+
 const nfSchema = z.object({
   nome: z.string().min(1, 'Obrigatório'),
   cpf_cnpj: z.string().optional(),
@@ -583,6 +591,39 @@ export function ObraDetailPage() {
   const [equipamentosObra, setEquipamentosObra] = useState<{ nome: string; tipo: string; data_inicio: string; custo_diaria: number; custo_diaria_override: number | null; dias: number }[]>([])
   const [loadingEquipamentos, setLoadingEquipamentos] = useState(false)
 
+  // ── Quick-add material ──
+  const [quickExpanded, setQuickExpanded] = useState(false)
+  const [quickSaving, setQuickSaving] = useState(false)
+
+  const quickForm = useForm<QuickMaterialValues>({
+    resolver: zodResolver(quickMaterialSchema),
+    defaultValues: { fornecedor: '', item: '', valor_total_reais: 0, data_compra: todayStr() },
+  })
+
+  async function handleQuickMaterial(data: QuickMaterialValues) {
+    if (!obra || !user) return
+    setQuickSaving(true)
+    const valorCentavos = Math.round(data.valor_total_reais * 100)
+    const { error } = await supabase.from('materiais').insert({
+      obra_id: obra.id,
+      user_id: user.id,
+      fornecedor: data.fornecedor,
+      item: data.item,
+      categoria: 'outros',
+      valor_total: valorCentavos,
+      data_compra: data.data_compra,
+      forma_pagamento: 'avista',
+    })
+    if (error) {
+      toast({ description: 'Erro ao salvar material.', variant: 'destructive' })
+    } else {
+      toast({ description: 'Material adicionado!' })
+      quickForm.reset({ fornecedor: '', item: '', valor_total_reais: 0, data_compra: todayStr() })
+      await loadMateriais()
+    }
+    setQuickSaving(false)
+  }
+
   // ── Loaders ──
   async function loadObra() {
     if (!id || !user) return
@@ -964,6 +1005,46 @@ export function ObraDetailPage() {
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-semibold text-[var(--color-text)]">Compras de Materiais</h2>
             <MaterialDialog obraId={obra.id} onSaved={loadMateriais} />
+          </div>
+          {/* Quick-add */}
+          <div className="mb-4 p-3 rounded-lg bg-[var(--color-surface-2)] border border-[var(--color-border)]">
+            <form onSubmit={quickForm.handleSubmit(handleQuickMaterial)}>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 items-end">
+                <div className="space-y-1">
+                  <Label className="text-xs text-[var(--color-muted)]">Fornecedor *</Label>
+                  <Input {...quickForm.register('fornecedor')} placeholder="Nome" className="h-8 text-sm bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-text)]" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-[var(--color-muted)]">Item *</Label>
+                  <Input {...quickForm.register('item')} placeholder="Descrição" className="h-8 text-sm bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-text)]" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-[var(--color-muted)]">Valor total (R$) *</Label>
+                  <Input type="number" step="0.01" {...quickForm.register('valor_total_reais')} placeholder="0,00" className="h-8 text-sm bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-text)]" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-[var(--color-muted)]">Data *</Label>
+                  <Input type="date" {...quickForm.register('data_compra')} className="h-8 text-sm bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-text)]" />
+                </div>
+              </div>
+              <div className="flex items-center justify-between mt-2">
+                <button
+                  type="button"
+                  onClick={() => setQuickExpanded(!quickExpanded)}
+                  className="text-xs text-[var(--color-primary)] hover:underline"
+                >
+                  {quickExpanded ? '▲ menos detalhes' : '▼ mais detalhes'}
+                </button>
+                <Button type="submit" size="sm" disabled={quickSaving} className="bg-[var(--color-primary)] text-white h-8">
+                  {quickSaving ? 'Salvando…' : '+ Adicionar'}
+                </Button>
+              </div>
+              {quickExpanded && (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
+                  {/* Campos opcionais: categoria, quantidade, unidade, forma_pagamento — use MaterialDialog para edição completa */}
+                </div>
+              )}
+            </form>
           </div>
           {loadingMateriais ? (
             <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-14 rounded bg-[var(--color-surface)] animate-pulse" />)}</div>
