@@ -604,23 +604,55 @@ export function ObraDetailPage() {
     if (!obra || !user) return
     setQuickSaving(true)
     const valorCentavos = Math.round(data.valor_total_reais * 100)
-    const { error } = await supabase.from('materiais').insert({
-      obra_id: obra.id,
-      user_id: user.id,
-      fornecedor: data.fornecedor,
-      item: data.item,
-      categoria: 'outros',
-      valor_total: valorCentavos,
-      data_compra: data.data_compra,
-      forma_pagamento: 'avista',
-    })
-    if (error) {
+
+    const { data: mat, error: matErr } = await supabase
+      .from('materiais')
+      .insert({
+        obra_id: obra.id,
+        user_id: user.id,
+        fornecedor: data.fornecedor,
+        item: data.item,
+        categoria: 'outros',
+        valor_total: valorCentavos,
+        data_compra: data.data_compra,
+        forma_pagamento: 'avista',
+      })
+      .select('id')
+      .single()
+
+    if (matErr || !mat) {
       toast({ description: 'Erro ao salvar material.', variant: 'destructive' })
-    } else {
-      toast({ description: 'Material adicionado!' })
-      quickForm.reset({ fornecedor: '', item: '', valor_total_reais: 0, data_compra: todayStr() })
-      await loadMateriais()
+      setQuickSaving(false)
+      return
     }
+
+    const { error: fluxoErr } = await supabase.from('fluxo_caixa').insert({
+      user_id: user!.id,
+      obra_id: obra.id,
+      escopo: 'pj_obra' as FluxoEscopo,
+      tipo: 'saida' as FluxoTipo,
+      origem: 'material' as FluxoOrigem,
+      origem_id: mat.id,
+      descricao: `Material: ${data.item} (${data.fornecedor})`,
+      categoria: 'outros',
+      valor: valorCentavos,
+      data_lancamento: data.data_compra,
+      status: 'previsto' as LancamentoStatus,
+      data_realizacao: null,
+      incluir_contador: true,
+      observacao: null,
+    })
+
+    if (fluxoErr) {
+      await supabase.from('materiais').delete().eq('id', mat.id)
+      toast({ description: 'Erro ao lançar no fluxo de caixa. Nenhum dado foi salvo.', variant: 'destructive' })
+      setQuickSaving(false)
+      return
+    }
+
+    toast({ description: 'Material adicionado!' })
+    quickForm.reset({ fornecedor: '', item: '', valor_total_reais: 0, data_compra: todayStr() })
+    await loadMateriais()
     setQuickSaving(false)
   }
 
