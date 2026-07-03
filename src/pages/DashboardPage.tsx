@@ -20,6 +20,8 @@ type MedicaoComObra = Medicao & {
   obras: { id: string; nome: string } | null
 }
 
+type FluxoCaixaComObra = FluxoCaixa & { obras: { nome: string } | null }
+
 export function DashboardPage() {
   const { user } = useAuth()
   const { toast } = useToast()
@@ -43,6 +45,7 @@ export function DashboardPage() {
   const [gastoMateriaisAnterior, setGastoMateriaisAnterior] = useState(0)
   const [gastoMaoObraAnterior, setGastoMaoObraAnterior] = useState(0)
   const [gastoOutrosAnterior, setGastoOutrosAnterior] = useState(0)
+  const [proximosVencimentos, setProximosVencimentos] = useState<FluxoCaixaComObra[]>([])
 
   const loadDashboard = useCallback(async () => {
     if (!user) return
@@ -152,6 +155,23 @@ export function DashboardPage() {
     setGastoMaoObraAnterior(fluxoMesAnt.filter(f => f.tipo === 'saida' && f.origem === 'mao_de_obra').reduce((a,f) => a + f.valor, 0))
     setGastoOutrosAnterior(fluxoMesAnt.filter(f => f.tipo === 'saida' && f.origem === 'manual').reduce((a,f) => a + f.valor, 0))
 
+    const em15dias = new Date(hoje)
+    em15dias.setDate(em15dias.getDate() + 15)
+    const hojeStr = hoje.toISOString().split('T')[0]
+    const em15diasStr = em15dias.toISOString().split('T')[0]
+
+    const vencimentosRes = await supabase
+      .from('fluxo_caixa')
+      .select('*, obras(nome)')
+      .eq('user_id', user.id)
+      .eq('status', 'previsto')
+      .gte('data_lancamento', hojeStr)
+      .lte('data_lancamento', em15diasStr)
+      .order('data_lancamento', { ascending: true })
+      .limit(5)
+
+    setProximosVencimentos((vencimentosRes.data ?? []) as FluxoCaixaComObra[])
+
     setLoading(false)
   }, [user, toast])
 
@@ -256,6 +276,45 @@ export function DashboardPage() {
         )}
       </section>
 
+      {/* Próximos vencimentos */}
+      {proximosVencimentos.length > 0 && (
+        <section>
+          <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">Próximos vencimentos</h2>
+          <Card className="bg-[var(--color-surface)] border-[var(--color-border)]">
+            <CardContent className="p-0">
+              <div className="divide-y divide-[var(--color-border)]">
+                {proximosVencimentos.map((v) => {
+                  const dias = Math.ceil(
+                    (new Date(v.data_lancamento + 'T00:00:00').getTime() - new Date().setHours(0,0,0,0)) / 86400000
+                  )
+                  const badgeColor = dias > 7
+                    ? 'bg-[var(--color-success)]/10 text-[var(--color-success)]'
+                    : dias >= 3
+                    ? 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]'
+                    : 'bg-[var(--color-danger)]/10 text-[var(--color-danger)]'
+                  return (
+                    <div key={v.id} className="flex items-center justify-between px-4 py-3">
+                      <div className="flex flex-col min-w-0 flex-1">
+                        <span className="text-sm font-medium text-[var(--color-text)] truncate">{v.descricao}</span>
+                        {v.obras?.nome && (
+                          <span className="text-xs text-[var(--color-muted)]">{v.obras.nome}</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 ml-4 shrink-0">
+                        <ValorMonetario value={v.valor} className="text-sm font-semibold text-[var(--color-text)]" />
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${badgeColor}`}>
+                          {dias === 0 ? 'hoje' : `${dias}d`}
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+      )}
+
       {/* Medições pendentes */}
       {medicoesPendentes.length > 0 && (
         <section>
@@ -327,6 +386,20 @@ function ObraKpiCard({ obra }: { obra: ObraComKpis }) {
   const margem = obra.margem_real ?? 0
   const margemPositiva = margem >= 0
 
+  // Calcular dias restantes
+  let diasRestantes: number | null = null
+  if (obra.prazo_termino) {
+    diasRestantes = Math.ceil((new Date(obra.prazo_termino + 'T00:00:00').getTime() - new Date().setHours(0,0,0,0)) / 86400000)
+  }
+
+  const prazoBadgeColor = diasRestantes === null
+    ? ''
+    : diasRestantes > 30
+    ? 'bg-[var(--color-success)]/10 text-[var(--color-success)]'
+    : diasRestantes > 10
+    ? 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]'
+    : 'bg-[var(--color-danger)]/10 text-[var(--color-danger)]'
+
   return (
     <Card className="bg-[var(--color-surface)] border-[var(--color-border)] flex flex-col">
       <CardHeader className="pb-2">
@@ -334,7 +407,14 @@ function ObraKpiCard({ obra }: { obra: ObraComKpis }) {
           <CardTitle className="text-sm font-semibold text-[var(--color-text)] leading-snug line-clamp-2">
             {obra.nome}
           </CardTitle>
-          <StatusBadge status={obra.status} />
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            <StatusBadge status={obra.status} />
+            {diasRestantes !== null && (
+              <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${prazoBadgeColor}`}>
+                {diasRestantes < 0 ? 'Prazo vencido' : `${diasRestantes}d prazo`}
+              </span>
+            )}
+          </div>
         </div>
         <p className="text-xs text-[var(--color-muted)] truncate">{obra.orgao_contratante}</p>
       </CardHeader>
