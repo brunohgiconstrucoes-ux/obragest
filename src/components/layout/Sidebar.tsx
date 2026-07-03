@@ -34,10 +34,18 @@ export function Sidebar() {
     <aside className="w-60 min-h-screen flex flex-col bg-[var(--color-surface)] border-r border-[var(--color-border)]">
       {/* Logo */}
       <div className="p-6 pb-4">
-        <div className="flex items-center gap-2">
-          <Building2 className="w-6 h-6 text-[var(--color-primary)]" />
-          <span className="font-bold text-lg text-[var(--color-text)] tracking-tight">ObraGest</span>
-        </div>
+        {perfil?.logo_url ? (
+          <img
+            src={perfil.logo_url}
+            alt="Logo da empresa"
+            className="h-9 object-contain max-w-[140px]"
+          />
+        ) : (
+          <div className="flex items-center gap-2">
+            <Building2 className="w-6 h-6 text-[var(--color-primary)]" />
+            <span className="font-bold text-lg text-[var(--color-text)] tracking-tight">ObraGest</span>
+          </div>
+        )}
       </div>
 
       <Separator className="bg-[var(--color-border)]" />
