@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -138,6 +138,54 @@ export function ConfiguracoesPage() {
     else toast({ description: 'Alíquotas padrão salvas!' })
   }
 
+  // --- Aba Identidade Visual ---
+  const [logoUploading, setLogoUploading] = useState(false)
+  const [logoPreview, setLogoPreview] = useState<string | null>(perfil?.logo_url ?? null)
+
+  useEffect(() => {
+    setLogoPreview(perfil?.logo_url ?? null)
+  }, [perfil?.logo_url])
+
+  async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file || !user) return
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ description: 'Imagem deve ter no máximo 2MB.', variant: 'destructive' })
+      return
+    }
+    setLogoUploading(true)
+    const ext = file.name.split('.').pop()
+    const path = `${user.id}/logo.${ext}`
+    const { error: uploadError } = await supabase.storage
+      .from('logos')
+      .upload(path, file, { upsert: true })
+    if (uploadError) {
+      toast({ description: 'Erro ao fazer upload do logo.', variant: 'destructive' })
+      setLogoUploading(false)
+      return
+    }
+    const { data } = supabase.storage.from('logos').getPublicUrl(path)
+    const url = data.publicUrl
+    const { error: updateError } = await supabase
+      .from('perfis')
+      .update({ logo_url: url })
+      .eq('id', user.id)
+    if (updateError) {
+      toast({ description: 'Erro ao salvar URL do logo.', variant: 'destructive' })
+    } else {
+      setLogoPreview(url)
+      toast({ description: 'Logo salvo com sucesso!' })
+    }
+    setLogoUploading(false)
+  }
+
+  async function handleLogoRemove() {
+    if (!user) return
+    await supabase.from('perfis').update({ logo_url: null }).eq('id', user.id)
+    setLogoPreview(null)
+    toast({ description: 'Logo removido.' })
+  }
+
   const inputClass = 'bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]'
   const labelClass = 'text-[var(--color-text)] text-sm font-medium'
 
@@ -150,6 +198,7 @@ export function ConfiguracoesPage() {
           <TabsTrigger value="pj">Dados PJ</TabsTrigger>
           <TabsTrigger value="pf">Dados Pessoais</TabsTrigger>
           <TabsTrigger value="aliquotas">Alíquotas Padrão</TabsTrigger>
+          <TabsTrigger value="identidade">Identidade Visual</TabsTrigger>
         </TabsList>
 
         {/* Aba PJ */}
@@ -301,6 +350,53 @@ export function ConfiguracoesPage() {
                   Salvar alíquotas
                 </Button>
               </form>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Aba Identidade Visual */}
+        <TabsContent value="identidade">
+          <Card className="bg-[var(--color-surface)] border-[var(--color-border)]">
+            <CardHeader>
+              <CardTitle className="text-[var(--color-text)] text-base">Logo da Empresa</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-[var(--color-muted)]">
+                Aparece na barra lateral e no cabeçalho dos PDFs gerados (boletins, RPAs, recibos).
+                Formatos aceitos: PNG, SVG, JPG. Tamanho máximo: 2MB.
+              </p>
+              {logoPreview && (
+                <div className="border border-[var(--color-border)] rounded-md p-4 flex items-center gap-4 bg-[var(--color-surface-2)]">
+                  <img
+                    src={logoPreview}
+                    alt="Logo da empresa"
+                    className="h-12 object-contain max-w-[200px]"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleLogoRemove}
+                    className="text-[var(--color-danger)] hover:text-[var(--color-danger)]"
+                  >
+                    Remover logo
+                  </Button>
+                </div>
+              )}
+              <div className="space-y-1.5">
+                <Label className={labelClass}>
+                  {logoPreview ? 'Substituir logo' : 'Selecionar logo'}
+                </Label>
+                <Input
+                  type="file"
+                  accept="image/png,image/svg+xml,image/jpeg"
+                  onChange={handleLogoUpload}
+                  disabled={logoUploading}
+                  className={inputClass}
+                />
+                {logoUploading && (
+                  <p className="text-xs text-[var(--color-muted)]">Enviando…</p>
+                )}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
