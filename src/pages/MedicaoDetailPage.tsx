@@ -210,11 +210,11 @@ export function MedicaoDetailPage() {
   }
 
   // ── Gerar PDF ──
-  function handleGerarPdf() {
+  async function handleGerarPdf() {
     if (!obra || !medicao) return
     setGerandoPdf(true)
     try {
-      gerarBoletimPDF(obra, medicao, itens, perfil)
+      await gerarBoletimPDF(obra, medicao, itens, perfil)
     } catch {
       toast({ description: 'Erro ao gerar PDF.', variant: 'destructive' })
     } finally {

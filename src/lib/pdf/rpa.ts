@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf'
 import { format, parseISO } from 'date-fns'
 import type { Obra, MaoDeObra, Perfil } from '@/types'
+import { fetchLogoBase64 } from './logoHelper'
 
 const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 
@@ -13,7 +14,7 @@ function fmtDate(iso: string | null): string {
   return format(parseISO(iso), 'dd/MM/yyyy')
 }
 
-export function gerarRpaPDF(obra: Obra, mdo: MaoDeObra, perfil: Perfil | null): void {
+export async function gerarRpaPDF(obra: Obra, mdo: MaoDeObra, perfil: Perfil | null): Promise<void> {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
 
   const W = 210
@@ -22,20 +23,30 @@ export function gerarRpaPDF(obra: Obra, mdo: MaoDeObra, perfil: Perfil | null): 
   let y = 14
 
   // ── Cabeçalho ────────────────────────────────────────────────────────────────
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(13)
   const empresa = perfil?.razao_social ?? 'ObraGest'
-  doc.text(empresa, marginL, y)
+
+  if (perfil?.logo_url) {
+    const base64 = await fetchLogoBase64(perfil.logo_url)
+    if (base64) {
+      doc.addImage(base64, 'PNG', marginL, y, 40, 13)
+      y += 16
+    }
+  } else {
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(13)
+    doc.text(empresa, marginL, y)
+    y += 5
+  }
 
   if (perfil?.cnpj) {
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(9)
-    y += 5
     doc.text(`CNPJ: ${perfil.cnpj}`, marginL, y)
+    y += 4
   }
 
   // Separador
-  y += 6
+  y += 2
   doc.setDrawColor(180, 180, 180)
   doc.line(marginL, y, W - marginR, y)
   y += 7

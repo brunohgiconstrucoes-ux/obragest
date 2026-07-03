@@ -202,7 +202,7 @@ export function AvulsoFormPage() {
 
     // 3. Generate PDF
     const mdoObj: MaoDeObra = mdo as MaoDeObra
-    gerarReciboAvulsoPDF(obra, mdoObj, perfil)
+    await gerarReciboAvulsoPDF(obra, mdoObj, perfil)
 
     toast({ description: 'Avulso registrado com sucesso!' })
     navigate(`/obras/${obra.id}?tab=mao-de-obra`)

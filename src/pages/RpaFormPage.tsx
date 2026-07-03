@@ -183,7 +183,7 @@ export function RpaFormPage() {
 
     // 3. Generate PDF
     const mdoObj: MaoDeObra = mdo as MaoDeObra
-    gerarRpaPDF(obra, mdoObj, perfil)
+    await gerarRpaPDF(obra, mdoObj, perfil)
 
     toast({ description: 'RPA registrado com sucesso!' })
     navigate(`/obras/${obra.id}?tab=mao-de-obra`)
