@@ -33,6 +33,16 @@ export function DashboardPage() {
   const [saldoPJ, setSaldoPJ] = useState(0)
   const [saldoPF, setSaldoPF] = useState(0)
   const [medicoesPendentes, setMedicoesPendentes] = useState<MedicaoComObra[]>([])
+  const [entradasMesPJ, setEntradasMesPJ] = useState(0)
+  const [saidasMesPJ, setSaidasMesPJ] = useState(0)
+  const [entradasMesPF, setEntradasMesPF] = useState(0)
+  const [saidasMesPF, setSaidasMesPF] = useState(0)
+  const [gastoMateriais, setGastoMateriais] = useState(0)
+  const [gastoMaoObra, setGastoMaoObra] = useState(0)
+  const [gastoOutros, setGastoOutros] = useState(0)
+  const [gastoMateriaisAnterior, setGastoMateriaisAnterior] = useState(0)
+  const [gastoMaoObraAnterior, setGastoMaoObraAnterior] = useState(0)
+  const [gastoOutrosAnterior, setGastoOutrosAnterior] = useState(0)
 
   const loadDashboard = useCallback(async () => {
     if (!user) return
@@ -98,6 +108,50 @@ export function DashboardPage() {
     setSaldoPF(pfEntradas - pfSaidas)
 
     setMedicoesPendentes((medicoesRes.data ?? []) as unknown as MedicaoComObra[])
+
+    const hoje = new Date()
+    const mesAtual = hoje.getMonth() + 1
+    const anoAtual = hoje.getFullYear()
+    const mesAnterior = mesAtual === 1 ? 12 : mesAtual - 1
+    const anoAnterior = mesAtual === 1 ? anoAtual - 1 : anoAtual
+
+    const primeiroDiaMes = `${anoAtual}-${String(mesAtual).padStart(2, '0')}-01`
+    const ultimoDiaMes = `${anoAtual}-${String(mesAtual).padStart(2, '0')}-${String(new Date(anoAtual, mesAtual, 0).getDate()).padStart(2, '0')}`
+    const primeiroDiaMesAnt = `${anoAnterior}-${String(mesAnterior).padStart(2, '0')}-01`
+    const ultimoDiaMesAnt = `${anoAnterior}-${String(mesAnterior).padStart(2, '0')}-${String(new Date(anoAnterior, mesAnterior, 0).getDate()).padStart(2, '0')}`
+
+    const [fluxoMesRes, fluxoMesAntRes] = await Promise.all([
+      supabase
+        .from('fluxo_caixa')
+        .select('tipo, escopo, origem, valor')
+        .eq('user_id', user.id)
+        .eq('status', 'realizado')
+        .gte('data_competencia', primeiroDiaMes)
+        .lte('data_competencia', ultimoDiaMes),
+      supabase
+        .from('fluxo_caixa')
+        .select('tipo, escopo, origem, valor')
+        .eq('user_id', user.id)
+        .eq('status', 'realizado')
+        .gte('data_competencia', primeiroDiaMesAnt)
+        .lte('data_competencia', ultimoDiaMesAnt),
+    ])
+
+    const fluxoMes = (fluxoMesRes.data ?? []) as FluxoCaixa[]
+    const fluxoMesAnt = (fluxoMesAntRes.data ?? []) as FluxoCaixa[]
+
+    setEntradasMesPJ(fluxoMes.filter(f => ['pj_obra','pj_admin'].includes(f.escopo) && f.tipo === 'entrada').reduce((a,f) => a + f.valor, 0))
+    setSaidasMesPJ(fluxoMes.filter(f => ['pj_obra','pj_admin'].includes(f.escopo) && f.tipo === 'saida').reduce((a,f) => a + f.valor, 0))
+    setEntradasMesPF(fluxoMes.filter(f => f.escopo === 'pf' && f.tipo === 'entrada').reduce((a,f) => a + f.valor, 0))
+    setSaidasMesPF(fluxoMes.filter(f => f.escopo === 'pf' && f.tipo === 'saida').reduce((a,f) => a + f.valor, 0))
+
+    setGastoMateriais(fluxoMes.filter(f => f.tipo === 'saida' && f.origem === 'material').reduce((a,f) => a + f.valor, 0))
+    setGastoMaoObra(fluxoMes.filter(f => f.tipo === 'saida' && f.origem === 'mao_de_obra').reduce((a,f) => a + f.valor, 0))
+    setGastoOutros(fluxoMes.filter(f => f.tipo === 'saida' && f.origem === 'manual').reduce((a,f) => a + f.valor, 0))
+    setGastoMateriaisAnterior(fluxoMesAnt.filter(f => f.tipo === 'saida' && f.origem === 'material').reduce((a,f) => a + f.valor, 0))
+    setGastoMaoObraAnterior(fluxoMesAnt.filter(f => f.tipo === 'saida' && f.origem === 'mao_de_obra').reduce((a,f) => a + f.valor, 0))
+    setGastoOutrosAnterior(fluxoMesAnt.filter(f => f.tipo === 'saida' && f.origem === 'manual').reduce((a,f) => a + f.valor, 0))
+
     setLoading(false)
   }, [user, toast])
 
@@ -156,9 +210,19 @@ export function DashboardPage() {
 
       {/* Saldo Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <SaldoCard label="Saldo PJ" valor={saldoPJ} cor="var(--color-pj)" />
-        <SaldoCard label="Saldo PF" valor={saldoPF} cor="var(--color-pf)" />
+        <SaldoCard label="Saldo PJ" valor={saldoPJ} cor="var(--color-pj)" entradasMes={entradasMesPJ} saidasMes={saidasMesPJ} />
+        <SaldoCard label="Saldo PF" valor={saldoPF} cor="var(--color-pf)" entradasMes={entradasMesPF} saidasMes={saidasMesPF} />
       </div>
+
+      {/* Gastos do mês */}
+      <section>
+        <h2 className="text-base font-semibold text-[var(--color-text)] mb-3">Gastos do mês</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <GastoMesCard label="Materiais" valor={gastoMateriais} valorAnterior={gastoMateriaisAnterior} />
+          <GastoMesCard label="Mão de Obra" valor={gastoMaoObra} valorAnterior={gastoMaoObraAnterior} />
+          <GastoMesCard label="Outros" valor={gastoOutros} valorAnterior={gastoOutrosAnterior} />
+        </div>
+      </section>
 
       {/* Obras em andamento */}
       <section>
@@ -215,12 +279,19 @@ export function DashboardPage() {
 
 // ─── Sub-components ────────────────────────────────────────────────────────────
 
-function SaldoCard({ label, valor, cor }: { label: string; valor: number; cor: string }) {
+function SaldoCard({ label, valor, cor, entradasMes, saidasMes }: {
+  label: string
+  valor: number
+  cor: string
+  entradasMes: number
+  saidasMes: number
+}) {
   const positivo = valor >= 0
   const Icon = positivo ? TrendingUp : TrendingDown
   const colorClass = positivo
     ? 'text-[var(--color-success)]'
     : 'text-[var(--color-danger)]'
+  const mesAtual = new Date().toLocaleDateString('pt-BR', { month: 'long' })
 
   return (
     <Card className="bg-[var(--color-surface)] border-[var(--color-border)]">
@@ -241,6 +312,11 @@ function SaldoCard({ label, valor, cor }: { label: string; valor: number; cor: s
         <p className="text-xs text-[var(--color-muted)] mt-1">
           {positivo ? 'Saldo positivo' : 'Saldo negativo'} — lançamentos realizados
         </p>
+        <div className="flex gap-3 mt-2 text-xs text-[var(--color-muted)]">
+          <span className="text-[var(--color-success)]">↑ <ValorMonetario value={entradasMes} className="inline" /></span>
+          <span className="text-[var(--color-danger)]">↓ <ValorMonetario value={saidasMes} className="inline" /></span>
+          <span>em {mesAtual}</span>
+        </div>
       </CardContent>
     </Card>
   )
@@ -313,6 +389,28 @@ function ObraKpiCard({ obra }: { obra: ObraComKpis }) {
           Ver obra
           <ArrowRight className="w-3 h-3" />
         </Link>
+      </CardContent>
+    </Card>
+  )
+}
+
+function GastoMesCard({ label, valor, valorAnterior }: { label: string; valor: number; valorAnterior: number }) {
+  const pct = valorAnterior > 0 ? Math.min((valor / valorAnterior) * 100, 100) : 0
+  return (
+    <Card className="bg-[var(--color-surface)] border-[var(--color-border)]">
+      <CardHeader className="pb-1">
+        <CardTitle className="text-xs font-medium text-[var(--color-muted)]">{label}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        <ValorMonetario value={valor} className="text-lg font-bold text-[var(--color-text)]" />
+        {valorAnterior > 0 && (
+          <>
+            <Progress value={pct} className="h-1.5" />
+            <p className="text-xs text-[var(--color-muted)]">
+              {pct.toFixed(0)}% vs mês anterior
+            </p>
+          </>
+        )}
       </CardContent>
     </Card>
   )
