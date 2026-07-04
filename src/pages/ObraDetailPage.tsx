@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { ArrowLeft, Edit, Plus, FileText, ClipboardList, Wrench, Users, TrendingUp, ExternalLink, Package, Gauge, Sparkles, Upload, Trash2, Pencil } from 'lucide-react'
+import { ArrowLeft, Edit, Plus, FileText, ClipboardList, Wrench, Users, TrendingUp, ExternalLink, Package, Gauge, Sparkles, Upload, Trash2, Pencil, CheckCircle2, Circle, FileDown } from 'lucide-react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -21,6 +21,7 @@ import { Label } from '@/components/ui/label'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { ValorMonetario } from '@/components/shared/ValorMonetario'
 import { extrairDadosNf } from '@/lib/gemini'
+import { gerarReciboAvulsoPDF } from '@/lib/pdf/recibo-avulso'
 import { CadastroCombobox } from '@/components/shared/CadastroCombobox'
 import { useCadastros } from '@/hooks/useCadastros'
 import type {
@@ -348,7 +349,10 @@ function MaterialDialog({ obraId, material, onSaved }: { obraId: string; materia
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-text)] max-w-lg">
+      <DialogContent
+        className="bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-text)] max-w-lg"
+        onPointerDownOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle className="text-[var(--color-text)]">{isEdit ? 'Editar Material' : 'Lançar Material'}</DialogTitle>
         </DialogHeader>
@@ -732,7 +736,7 @@ type TabValue = typeof TABS[number]
 
 export function ObraDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const { user } = useAuth()
+  const { user, perfil } = useAuth()
   const { toast } = useToast()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -969,6 +973,26 @@ export function ObraDetailPage() {
       .order('data_pagamento', { ascending: false })
     if (!error && data) setMaoDeObra(data)
     setLoadingMao(false)
+  }
+
+  async function marcarMaoPago(mo: MaoDeObra) {
+    if (!user || !obra) return
+    const novoStatus = mo.status === 'realizado' ? 'previsto' : 'realizado'
+    const dataReal = novoStatus === 'realizado' ? todayStr() : null
+    await supabase.from('mao_de_obra').update({ status: novoStatus, data_pagamento: dataReal ?? mo.data_pagamento })
+      .eq('id', mo.id).eq('user_id', user.id)
+    await supabase.from('fluxo_caixa').update({ status: novoStatus, data_realizada: dataReal })
+      .eq('origem_id', mo.id).eq('origem', 'mao_obra')
+    loadMaoDeObra()
+  }
+
+  async function gerarReciboMao(mo: MaoDeObra) {
+    if (!obra) return
+    try {
+      await gerarReciboAvulsoPDF(obra, mo, perfil ?? null)
+    } catch {
+      toast({ description: 'Erro ao gerar recibo.', variant: 'destructive' })
+    }
   }
 
   async function loadFluxo() {
@@ -1506,11 +1530,13 @@ export function ObraDetailPage() {
                     <th className="text-right px-3 py-2 text-xs text-[var(--color-muted)] font-medium cursor-pointer select-none hover:text-[var(--color-text)]" onClick={() => toggleSort(sortMao, 'valor_pago', setSortMao)}>Valor Pago<SortIcon col="valor_pago" sort={sortMao} /></th>
                     <th className="text-center px-3 py-2 text-xs text-[var(--color-muted)] font-medium cursor-pointer select-none hover:text-[var(--color-text)]" onClick={() => toggleSort(sortMao, 'status', setSortMao)}>Status<SortIcon col="status" sort={sortMao} /></th>
                     <th className="text-center px-3 py-2 text-xs text-[var(--color-muted)] font-medium cursor-pointer select-none hover:text-[var(--color-text)]" onClick={() => toggleSort(sortMao, 'data_pagamento', setSortMao)}>Data<SortIcon col="data_pagamento" sort={sortMao} /></th>
+                    <th className="text-center px-3 py-2 text-xs text-[var(--color-muted)] font-medium">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
                   {sortAndFilter(maoDeObra as unknown as Record<string, unknown>[], searchMao, ['nome', 'funcao'], sortMao).map(mo_ => {
                   const mo = mo_ as MaoDeObra
+                  const pago = mo.status === 'realizado'
                   return (
                     <tr key={mo.id} className="border-b border-[var(--color-border)] hover:bg-[var(--color-surface-2)]/50">
                       <td className="px-3 py-2 text-[var(--color-text)] font-medium">{mo.nome}</td>
@@ -1522,11 +1548,31 @@ export function ObraDetailPage() {
                       </td>
                       <td className="px-3 py-2 text-right font-medium"><ValorMonetario value={mo.valor_pago} /></td>
                       <td className="px-3 py-2 text-center">
-                        <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${mo.status === 'realizado' ? 'bg-green-900/40 text-green-400' : 'bg-yellow-900/30 text-yellow-400'}`}>
-                          {mo.status === 'realizado' ? 'Pago' : 'Pendente'}
+                        <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${pago ? 'bg-green-900/40 text-green-400' : 'bg-yellow-900/30 text-yellow-400'}`}>
+                          {pago ? 'Pago' : 'Pendente'}
                         </span>
                       </td>
                       <td className="px-3 py-2 text-center text-[var(--color-muted)]">{fmtDate(mo.data_pagamento)}</td>
+                      <td className="px-3 py-2 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            title={pago ? 'Desfazer pagamento' : 'Marcar como pago'}
+                            onClick={() => marcarMaoPago(mo)}
+                            className={`rounded-full p-0.5 transition-colors ${pago ? 'text-green-400 hover:text-yellow-400' : 'text-[var(--color-muted)] hover:text-green-400'}`}
+                          >
+                            {pago ? <CheckCircle2 className="w-5 h-5" /> : <Circle className="w-5 h-5" />}
+                          </button>
+                          {mo.modalidade === 'avulso' && (
+                            <button
+                              title="Gerar recibo PDF"
+                              onClick={() => gerarReciboMao(mo)}
+                              className="text-[var(--color-muted)] hover:text-[var(--color-primary)] p-0.5 rounded transition-colors"
+                            >
+                              <FileDown className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   )
                   })}
