@@ -616,6 +616,10 @@ export function ObraDetailPage() {
         valor_total: valorCentavos,
         data_compra: data.data_compra,
         forma_pagamento: 'avista',
+        quantidade: null,
+        unidade: null,
+        incluir_contador: false,
+        observacao: null,
       })
       .select('id')
       .single()

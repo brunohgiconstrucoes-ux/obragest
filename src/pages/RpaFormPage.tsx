@@ -103,11 +103,6 @@ export function RpaFormPage() {
   const issAliq = (obra?.aliquota_iss ?? 0) || (perfil?.aliquota_iss ?? 2)
   const irrfAliq = (obra?.aliquota_irrf ?? 0) || (perfil?.aliquota_irrf ?? 1.5)
 
-  // keep legacy names for onSubmit compatibility
-  const aliquotaInss = inssAliq
-  const aliquotaIss = issAliq
-  const aliquotaIrrf = irrfAliq
-
   const retencaoInss = Math.round(valorBrutoCentavos * inssAliq / 100)
   const retencaoIss = Math.round(valorBrutoCentavos * issAliq / 100)
   const retencaoIrrf = Math.round(valorBrutoCentavos * irrfAliq / 100)

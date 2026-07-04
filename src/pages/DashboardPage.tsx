@@ -170,7 +170,7 @@ export function DashboardPage() {
       .order('data_realizacao', { ascending: true })
       .limit(5)
 
-    setProximosVencimentos((vencimentosRes.data ?? []) as FluxoCaixaComObra[])
+    setProximosVencimentos((vencimentosRes.data ?? []) as unknown as FluxoCaixaComObra[])
 
     setLoading(false)
   }, [user, toast])
