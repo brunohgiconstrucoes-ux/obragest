@@ -40,8 +40,15 @@ const equipSchema = z.object({
   nome: z.string().min(1, 'Obrigatório'),
   tipo: z.enum(['proprio', 'alugado', 'terceiro']),
   numero_serie: z.string().optional(),
-  valor_aquisicao_reais: z.coerce.number().min(0),
-  custo_diaria_reais: z.coerce.number().min(0),
+  // Próprio
+  valor_aquisicao_reais: z.coerce.number().min(0).optional(),
+  // Alugado / Terceiro
+  empresa_locadora: z.string().optional(),
+  data_inicio_locacao: z.string().optional(),
+  data_fim_locacao: z.string().optional(),
+  custo_tipo: z.enum(['diaria', 'mensal']).optional(),
+  // Todos
+  custo_valor_reais: z.coerce.number().min(0).optional(),
   proxima_manutencao: z.string().optional(),
 })
 
@@ -76,8 +83,9 @@ export function EquipamentosPage() {
 
   const equipForm = useForm<EquipForm>({
     resolver: zodResolver(equipSchema),
-    defaultValues: { nome: '', tipo: 'proprio', numero_serie: '', valor_aquisicao_reais: 0, custo_diaria_reais: 0, proxima_manutencao: '' },
+    defaultValues: { nome: '', tipo: 'proprio', numero_serie: '', valor_aquisicao_reais: 0, custo_valor_reais: 0, custo_tipo: 'diaria', proxima_manutencao: '' },
   })
+  const tipoWatch = equipForm.watch('tipo')
   const alocacaoForm = useForm<AlocacaoForm>({
     resolver: zodResolver(alocacaoSchema),
     defaultValues: { equipamento_id: '', obra_id: '', data_inicio: todayStr(), custo_diaria_override_reais: 0, observacao: '' },
@@ -109,16 +117,21 @@ export function EquipamentosPage() {
   async function onSaveEquip(values: EquipForm) {
     if (!user) return
     setSaving(true)
+    const isAlugado = values.tipo === 'alugado' || values.tipo === 'terceiro'
     const { error } = await supabase.from('equipamentos').insert({
       user_id: user.id,
       nome: values.nome,
       tipo: values.tipo as EquipamentoTipo,
-      numero_serie: values.numero_serie || null,
-      valor_aquisicao: Math.round(values.valor_aquisicao_reais * 100),
-      custo_diaria: Math.round(values.custo_diaria_reais * 100),
+      numero_serie: !isAlugado ? (values.numero_serie || null) : null,
+      valor_aquisicao: !isAlugado ? Math.round((values.valor_aquisicao_reais ?? 0) * 100) : 0,
+      custo_diaria: Math.round((values.custo_valor_reais ?? 0) * 100),
+      empresa_locadora: isAlugado ? (values.empresa_locadora || null) : null,
+      data_inicio_locacao: isAlugado ? (values.data_inicio_locacao || null) : null,
+      data_fim_locacao: isAlugado ? (values.data_fim_locacao || null) : null,
+      custo_tipo: isAlugado ? (values.custo_tipo ?? 'diaria') : 'diaria',
       proxima_manutencao: values.proxima_manutencao || null,
       status: 'disponivel' as EquipamentoStatus,
-    })
+    } as any)
     setSaving(false)
     if (error) { toast({ title: 'Erro ao salvar equipamento', variant: 'destructive' }); return }
     toast({ title: 'Equipamento cadastrado' })
@@ -332,12 +345,12 @@ export function EquipamentosPage() {
             <DialogTitle>Novo Equipamento</DialogTitle>
           </DialogHeader>
           <form onSubmit={equipForm.handleSubmit(onSaveEquip)} className="space-y-4">
-            <div>
-              <Label className="text-[var(--color-muted)] text-sm">Nome *</Label>
-              <Input {...equipForm.register('nome')} className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]" placeholder="Ex: Betoneira 400L" />
-              {equipForm.formState.errors.nome && <p className="text-xs text-[var(--color-danger)] mt-1">{equipForm.formState.errors.nome.message}</p>}
-            </div>
             <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2">
+                <Label className="text-[var(--color-muted)] text-sm">Nome *</Label>
+                <Input {...equipForm.register('nome')} className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]" placeholder="Ex: Betoneira 400L" />
+                {equipForm.formState.errors.nome && <p className="text-xs text-[var(--color-danger)] mt-1">{equipForm.formState.errors.nome.message}</p>}
+              </div>
               <div>
                 <Label className="text-[var(--color-muted)] text-sm">Tipo *</Label>
                 <Controller name="tipo" control={equipForm.control} render={({ field }) => (
@@ -351,23 +364,66 @@ export function EquipamentosPage() {
                   </Select>
                 )} />
               </div>
-              <div>
-                <Label className="text-[var(--color-muted)] text-sm">Número de série</Label>
-                <Input {...equipForm.register('numero_serie')} className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]" />
-              </div>
+
+              {/* Campos exclusivos de Próprio */}
+              {tipoWatch === 'proprio' && (
+                <>
+                  <div>
+                    <Label className="text-[var(--color-muted)] text-sm">Número de série</Label>
+                    <Input {...equipForm.register('numero_serie')} className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]" />
+                  </div>
+                  <div>
+                    <Label className="text-[var(--color-muted)] text-sm">Valor de aquisição (R$)</Label>
+                    <Input type="number" step="0.01" min="0" {...equipForm.register('valor_aquisicao_reais')} className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]" />
+                  </div>
+                </>
+              )}
+
+              {/* Campos exclusivos de Alugado / Terceiro */}
+              {(tipoWatch === 'alugado' || tipoWatch === 'terceiro') && (
+                <>
+                  <div>
+                    <Label className="text-[var(--color-muted)] text-sm">
+                      {tipoWatch === 'alugado' ? 'Empresa locadora' : 'Empresa / Proprietário'}
+                    </Label>
+                    <Input {...equipForm.register('empresa_locadora')} className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]" />
+                  </div>
+                  <div>
+                    <Label className="text-[var(--color-muted)] text-sm">Início da locação</Label>
+                    <Input type="date" {...equipForm.register('data_inicio_locacao')} className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]" />
+                  </div>
+                  <div>
+                    <Label className="text-[var(--color-muted)] text-sm">Fim da locação</Label>
+                    <Input type="date" {...equipForm.register('data_fim_locacao')} className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]" />
+                  </div>
+                </>
+              )}
             </div>
+
+            {/* Custo */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-[var(--color-muted)] text-sm">Valor de aquisição (R$)</Label>
-                <Input type="number" step="0.01" min="0" {...equipForm.register('valor_aquisicao_reais')} className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]" />
+                <Label className="text-[var(--color-muted)] text-sm">
+                  {tipoWatch === 'proprio' ? 'Custo operacional (R$)' : 'Custo de locação (R$)'}
+                </Label>
+                <Input type="number" step="0.01" min="0" {...equipForm.register('custo_valor_reais')} className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]" />
               </div>
               <div>
-                <Label className="text-[var(--color-muted)] text-sm">Custo/dia (R$)</Label>
-                <Input type="number" step="0.01" min="0" {...equipForm.register('custo_diaria_reais')} className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]" />
+                <Label className="text-[var(--color-muted)] text-sm">Período do custo</Label>
+                <Controller name="custo_tipo" control={equipForm.control} render={({ field }) => (
+                  <Select onValueChange={field.onChange} value={field.value ?? 'diaria'}>
+                    <SelectTrigger className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]"><SelectValue /></SelectTrigger>
+                    <SelectContent className="bg-[var(--color-surface)] border-[var(--color-border)]">
+                      <SelectItem value="diaria" className="text-[var(--color-text)]">Por dia</SelectItem>
+                      <SelectItem value="mensal" className="text-[var(--color-text)]">Por mês</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )} />
               </div>
             </div>
+
             <div>
-              <Label className="text-[var(--color-muted)] text-sm">Próxima manutenção</Label>
+              <Label className="text-[var(--color-muted)] text-sm">Próxima manutenção (opcional)</Label>
               <Input type="date" {...equipForm.register('proxima_manutencao')} className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]" />
             </div>
             <DialogFooter>

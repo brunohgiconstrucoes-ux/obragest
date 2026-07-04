@@ -490,6 +490,17 @@ function ExcluirObraDialog({ obraId, obraNome, onExcluido }: { obraId: string; o
 
   async function handleExcluir() {
     setExcluindo(true)
+    // Cascade delete: children before parent
+    const { data: medicoes } = await supabase.from('medicoes').select('id').eq('obra_id', obraId)
+    if (medicoes?.length) {
+      await supabase.from('medicao_itens').delete().in('medicao_id', medicoes.map(m => m.id))
+    }
+    await supabase.from('medicoes').delete().eq('obra_id', obraId)
+    await supabase.from('fluxo_caixa').delete().eq('obra_id', obraId)
+    await supabase.from('mao_de_obra').delete().eq('obra_id', obraId)
+    await supabase.from('materiais').delete().eq('obra_id', obraId)
+    await supabase.from('planilha_itens').delete().eq('obra_id', obraId)
+    await supabase.from('alocacoes_equipamento').delete().eq('obra_id', obraId)
     const { error } = await supabase.from('obras').delete().eq('id', obraId)
     if (error) {
       toast({ description: 'Erro ao excluir obra.', variant: 'destructive' })
