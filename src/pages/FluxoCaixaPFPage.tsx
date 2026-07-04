@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
-import { format, parseISO, getDaysInMonth } from 'date-fns'
-import { ptBR } from 'date-fns/locale'
+import { getDaysInMonth } from 'date-fns'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, CheckCircle } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { parseCentavos, todayStr } from '@/lib/currency'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
@@ -13,7 +12,6 @@ import { useToast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   Dialog,
@@ -31,6 +29,89 @@ import {
 } from '@/components/ui/select'
 import { ValorMonetario } from '@/components/shared/ValorMonetario'
 import type { FluxoCaixa } from '@/types'
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+type FluxoCaixaComObra = FluxoCaixa & { obras: { nome: string } | null }
+
+// ── Sub-component: LancamentoRow ──────────────────────────────────────────────
+
+function LancamentoRow({
+  lancamento,
+  onConfirm,
+}: {
+  lancamento: FluxoCaixaComObra
+  onConfirm: ((id: string, data: string) => Promise<void>) | null
+}) {
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [dataRealizada, setDataRealizada] = useState(todayStr())
+  const [confirmando, setConfirmando] = useState(false)
+
+  const isPrevisto = lancamento.status === 'previsto'
+  const isEntrada = lancamento.tipo === 'entrada'
+
+  return (
+    <div className={`flex items-center justify-between px-4 py-3 ${isPrevisto ? 'opacity-80' : ''}`}>
+      <div className="flex flex-col min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-[var(--color-text)] truncate">
+            {lancamento.descricao}
+          </span>
+          {isPrevisto && (
+            <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--color-warning)]/10 text-[var(--color-warning)] shrink-0">
+              previsto
+            </span>
+          )}
+        </div>
+        {lancamento.obras?.nome && (
+          <span className="text-xs text-[var(--color-muted)]">{lancamento.obras.nome}</span>
+        )}
+      </div>
+      <div className="flex items-center gap-3 ml-4 shrink-0">
+        <ValorMonetario
+          value={lancamento.valor}
+          className={`text-sm font-semibold ${isEntrada ? 'text-[var(--color-success)]' : 'text-[var(--color-danger)]'}`}
+        />
+        {onConfirm && isPrevisto && (
+          <div className="relative">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 px-2 text-xs border-[var(--color-border)] text-[var(--color-success)]"
+              onClick={() => setConfirmOpen(!confirmOpen)}
+            >
+              ✓
+            </Button>
+            {confirmOpen && (
+              <div className="absolute right-0 top-8 z-10 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg p-3 shadow-lg w-52 space-y-2">
+                <p className="text-xs font-medium text-[var(--color-text)]">Confirmar realização</p>
+                <Input
+                  type="date"
+                  value={dataRealizada}
+                  onChange={e => setDataRealizada(e.target.value)}
+                  className="h-7 text-xs bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]"
+                />
+                <Button
+                  size="sm"
+                  className="w-full h-7 text-xs bg-[var(--color-primary)] text-white"
+                  disabled={confirmando}
+                  onClick={async () => {
+                    setConfirmando(true)
+                    await onConfirm(lancamento.id, dataRealizada)
+                    setConfirmOpen(false)
+                    setConfirmando(false)
+                  }}
+                >
+                  {confirmando ? 'Salvando…' : 'Confirmar'}
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
 
 // ── Zod schema ────────────────────────────────────────────────────────────────
 
@@ -72,7 +153,7 @@ export function FluxoCaixaPFPage() {
   const mes = mesAtivo
   const ano = anoAtivo
 
-  const [lancamentos, setLancamentos] = useState<FluxoCaixa[]>([])
+  const [lancamentos, setLancamentos] = useState<FluxoCaixaComObra[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -110,7 +191,7 @@ export function FluxoCaixaPFPage() {
     if (error) {
       toast({ title: 'Erro ao carregar lançamentos', variant: 'destructive' })
     } else {
-      setLancamentos(data ?? [])
+      setLancamentos((data as unknown as FluxoCaixaComObra[]) ?? [])
     }
     setLoading(false)
   }, [user, mes, ano, toast])
@@ -119,20 +200,19 @@ export function FluxoCaixaPFPage() {
     loadLancamentos()
   }, [loadLancamentos])
 
-  // ── Marcar como realizado ──────────────────────────────────────────────────
+  // ── Confirmar lançamento como realizado ───────────────────────────────────
 
-  async function marcarRealizado(lancamento: FluxoCaixa) {
+  async function handleConfirmarRealizado(id: string, dataRealizada: string) {
     const { error } = await supabase
       .from('fluxo_caixa')
-      .update({ status: 'realizado', data_realizacao: todayStr() })
-      .eq('id', lancamento.id)
+      .update({ status: 'realizado', data_competencia: dataRealizada })
+      .eq('id', id)
       .eq('user_id', user!.id)
-
     if (error) {
-      toast({ title: 'Erro ao atualizar', variant: 'destructive' })
+      toast({ description: 'Erro ao confirmar lançamento.', variant: 'destructive' })
     } else {
-      toast({ title: 'Lançamento marcado como realizado' })
-      loadLancamentos()
+      toast({ description: 'Lançamento confirmado!' })
+      await loadLancamentos()
     }
   }
 
@@ -269,67 +349,44 @@ export function FluxoCaixaPFPage() {
         </Card>
       </div>
 
-      {/* Tabela */}
-      <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg overflow-hidden">
-        {loading ? (
-          <div className="p-8 text-center text-[var(--color-muted)]">Carregando...</div>
-        ) : lancamentos.length === 0 ? (
-          <div className="p-8 text-center text-[var(--color-muted)]">Nenhum lançamento no período.</div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-[var(--color-border)] bg-[var(--color-surface-2)]">
-                <th className="text-left px-4 py-3 text-[var(--color-muted)] font-medium">Data</th>
-                <th className="text-left px-4 py-3 text-[var(--color-muted)] font-medium">Descrição</th>
-                <th className="text-left px-4 py-3 text-[var(--color-muted)] font-medium">Tipo</th>
-                <th className="text-right px-4 py-3 text-[var(--color-muted)] font-medium">Valor</th>
-                <th className="text-left px-4 py-3 text-[var(--color-muted)] font-medium">Status</th>
-                <th className="px-4 py-3"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {lancamentos.map(l => (
-                <tr key={l.id} className="border-b border-[var(--color-border)] last:border-0 hover:bg-[var(--color-surface-2)] transition-colors">
-                  <td className="px-4 py-3 text-[var(--color-muted)]">
-                    {format(parseISO(l.data_lancamento), 'dd/MM/yyyy', { locale: ptBR })}
-                  </td>
-                  <td className="px-4 py-3">{l.descricao}</td>
-                  <td className="px-4 py-3">
-                    {l.tipo === 'entrada' ? (
-                      <Badge className="bg-[var(--color-success)] text-white border-0">Entrada</Badge>
-                    ) : (
-                      <Badge className="bg-[var(--color-danger)] text-white border-0">Saída</Badge>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <ValorMonetario value={l.valor} />
-                  </td>
-                  <td className="px-4 py-3">
-                    {l.status === 'realizado' ? (
-                      <Badge className="bg-[var(--color-success)] text-white border-0">Realizado</Badge>
-                    ) : (
-                      <Badge variant="outline" className="border-[var(--color-border)] text-[var(--color-muted)]">Previsto</Badge>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    {l.status === 'previsto' && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => marcarRealizado(l)}
-                        className="text-[var(--color-success)] hover:text-[var(--color-success)] hover:bg-[var(--color-surface-2)] text-xs"
-                      >
-                        <CheckCircle size={14} className="mr-1" />
-                        Marcar realizado
-                      </Button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      {/* Lançamentos separados por status */}
+      {loading ? (
+        <div className="p-8 text-center text-[var(--color-muted)]">Carregando...</div>
+      ) : lancamentos.length === 0 ? (
+        <div className="p-8 text-center text-[var(--color-muted)]">Nenhum lançamento no período.</div>
+      ) : (
+        <div>
+          {realizados.length > 0 && (
+            <div className="mb-6">
+              <h3 className="text-sm font-semibold text-[var(--color-muted)] uppercase tracking-wide mb-2 px-1">
+                Realizados ({realizados.length})
+              </h3>
+              <Card className="bg-[var(--color-surface)] border-[var(--color-border)]">
+                <CardContent className="p-0">
+                  <div className="divide-y divide-[var(--color-border)]">
+                    {realizados.map(l => <LancamentoRow key={l.id} lancamento={l} onConfirm={null} />)}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {previstos.length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold text-[var(--color-muted)] uppercase tracking-wide mb-2 px-1">
+                Previstos ({previstos.length})
+              </h3>
+              <Card className="bg-[var(--color-surface-2)] border-[var(--color-border)] border-dashed">
+                <CardContent className="p-0">
+                  <div className="divide-y divide-[var(--color-border)]">
+                    {previstos.map(l => <LancamentoRow key={l.id} lancamento={l} onConfirm={handleConfirmarRealizado} />)}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Sumário */}
       <div className="grid grid-cols-3 gap-4">
