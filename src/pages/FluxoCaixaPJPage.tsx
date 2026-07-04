@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { format, parseISO, getDaysInMonth } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { useForm, Controller } from 'react-hook-form'
@@ -13,6 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import { Card, CardContent } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -67,10 +69,25 @@ function origemLabel(origem: string): string {
 export function FluxoCaixaPJPage() {
   const { user } = useAuth()
   const { toast } = useToast()
+  const location = useLocation()
+  const [searchParams, setSearchParams] = useSearchParams()
 
-  const now = new Date()
-  const [mes, setMes] = useState(now.getMonth() + 1)
-  const [ano, setAno] = useState(now.getFullYear())
+  const hoje = new Date()
+  const paramMes = searchParams.get('mes')
+  const anoAtivo = paramMes ? parseInt(paramMes.split('-')[0]) : hoje.getFullYear()
+  const mesAtivo = paramMes ? parseInt(paramMes.split('-')[1]) : hoje.getMonth() + 1
+
+  function navegarMes(delta: number) {
+    let novoMes = mesAtivo + delta
+    let novoAno = anoAtivo
+    if (novoMes > 12) { novoMes = 1; novoAno++ }
+    if (novoMes < 1) { novoMes = 12; novoAno-- }
+    setSearchParams({ mes: `${novoAno}-${String(novoMes).padStart(2, '0')}` })
+  }
+
+  // Keep legacy aliases for the rest of the code
+  const mes = mesAtivo
+  const ano = anoAtivo
 
   const [lancamentos, setLancamentos] = useState<FluxoCaixaComObra[]>([])
   const [loading, setLoading] = useState(true)
@@ -171,6 +188,15 @@ export function FluxoCaixaPJPage() {
 
   // ── Sumário ────────────────────────────────────────────────────────────────
 
+  const realizados = lancamentos.filter(l => l.status === 'realizado')
+  const previstos = lancamentos.filter(l => l.status === 'previsto')
+
+  const totalEntradasReal = realizados.filter(l => l.tipo === 'entrada').reduce((a, l) => a + l.valor, 0)
+  const totalSaidasReal = realizados.filter(l => l.tipo === 'saida').reduce((a, l) => a + l.valor, 0)
+  const saldoReal = totalEntradasReal - totalSaidasReal
+  const totalEntradasPrev = previstos.filter(l => l.tipo === 'entrada').reduce((a, l) => a + l.valor, 0)
+  const totalSaidasPrev = previstos.filter(l => l.tipo === 'saida').reduce((a, l) => a + l.valor, 0)
+
   const totalEntradas = lancamentos
     .filter(l => l.tipo === 'entrada')
     .reduce((s, l) => s + l.valor, 0)
@@ -181,52 +207,83 @@ export function FluxoCaixaPJPage() {
 
   const saldoLiquido = totalEntradas - totalSaidas
 
-  const meses = [
-    'Janeiro','Fevereiro','Março','Abril','Maio','Junho',
-    'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro',
-  ]
-
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div className="text-[var(--color-text)] space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold">Fluxo de Caixa PJ</h1>
+        <h1 className="text-2xl font-bold">Fluxo de Caixa</h1>
         <p className="text-[var(--color-muted)] text-sm mt-0.5">Consolidado de obras e administrativo</p>
       </div>
 
-      {/* Filtros */}
-      <div className="flex gap-3 items-end flex-wrap">
-        <div>
-          <Label className="text-[var(--color-muted)] text-xs mb-1 block">Mês</Label>
-          <select
-            value={mes}
-            onChange={e => setMes(Number(e.target.value))}
-            className="bg-[var(--color-surface-2)] border border-[var(--color-border)] text-[var(--color-text)] rounded px-3 py-2 text-sm"
-          >
-            {meses.map((m, i) => (
-              <option key={i + 1} value={i + 1}>{m}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <Label className="text-[var(--color-muted)] text-xs mb-1 block">Ano</Label>
-          <Input
-            type="number"
-            value={ano}
-            onChange={e => setAno(Number(e.target.value))}
-            className="w-24 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]"
-          />
-        </div>
+      {/* Abas PJ/PF */}
+      <div className="flex gap-1 bg-[var(--color-surface-2)] p-1 rounded-lg w-fit">
+        <Link
+          to="/fluxo/pj"
+          className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+            location.pathname.startsWith('/fluxo/pj')
+              ? 'bg-[var(--color-primary)] text-white'
+              : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'
+          }`}
+        >
+          Fluxo PJ
+        </Link>
+        <Link
+          to="/fluxo/pf"
+          className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+            location.pathname.startsWith('/fluxo/pf')
+              ? 'bg-[var(--color-primary)] text-white'
+              : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'
+          }`}
+        >
+          Fluxo PF
+        </Link>
+      </div>
+
+      {/* Navegação de período */}
+      <div className="flex items-center gap-3">
+        <button onClick={() => navegarMes(-1)} className="p-1 rounded hover:bg-[var(--color-surface-2)] text-[var(--color-muted)]">←</button>
+        <span className="text-sm font-medium text-[var(--color-text)] capitalize">
+          {new Date(anoAtivo, mesAtivo - 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+        </span>
+        <button onClick={() => navegarMes(1)} className="p-1 rounded hover:bg-[var(--color-surface-2)] text-[var(--color-muted)]">→</button>
         <Button
           variant="outline"
-          className="border-[var(--color-border)] text-[var(--color-text)]"
+          className="ml-auto border-[var(--color-border)] text-[var(--color-text)]"
           onClick={() => setDialogOpen(true)}
         >
           <Plus size={16} className="mr-2" />
           Novo lançamento administrativo
         </Button>
+      </div>
+
+      {/* Cards de resumo */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Card className="bg-[var(--color-surface)] border-[var(--color-border)]">
+          <CardContent className="p-3">
+            <p className="text-xs text-[var(--color-muted)]">Entradas realizadas</p>
+            <ValorMonetario value={totalEntradasReal} className="text-base font-bold text-[var(--color-success)]" />
+          </CardContent>
+        </Card>
+        <Card className="bg-[var(--color-surface)] border-[var(--color-border)]">
+          <CardContent className="p-3">
+            <p className="text-xs text-[var(--color-muted)]">Saídas realizadas</p>
+            <ValorMonetario value={totalSaidasReal} className="text-base font-bold text-[var(--color-danger)]" />
+          </CardContent>
+        </Card>
+        <Card className="bg-[var(--color-surface)] border-[var(--color-border)]">
+          <CardContent className="p-3">
+            <p className="text-xs text-[var(--color-muted)]">Saldo do período</p>
+            <ValorMonetario value={saldoReal} className={`text-base font-bold ${saldoReal >= 0 ? 'text-[var(--color-success)]' : 'text-[var(--color-danger)]'}`} />
+          </CardContent>
+        </Card>
+        <Card className="bg-[var(--color-surface-2)] border-[var(--color-border)] border-dashed">
+          <CardContent className="p-3">
+            <p className="text-xs text-[var(--color-muted)]">Previsão líquida</p>
+            <ValorMonetario value={totalEntradasPrev - totalSaidasPrev} className="text-base font-bold text-[var(--color-muted)]" />
+          </CardContent>
+        </Card>
       </div>
 
       {/* Tabela */}
