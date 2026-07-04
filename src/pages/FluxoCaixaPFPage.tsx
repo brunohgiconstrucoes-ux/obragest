@@ -205,7 +205,7 @@ export function FluxoCaixaPFPage() {
   async function handleConfirmarRealizado(id: string, dataRealizada: string) {
     const { error } = await supabase
       .from('fluxo_caixa')
-      .update({ status: 'realizado', data_competencia: dataRealizada })
+      .update({ status: 'realizado', data_realizacao: dataRealizada })
       .eq('id', id)
       .eq('user_id', user!.id)
     if (error) {
