@@ -37,7 +37,7 @@ export function Sidebar() {
           <img
             src={perfil.logo_url}
             alt="Logo da empresa"
-            className="h-14 object-contain max-w-[180px]"
+            className="h-14 object-contain max-w-[360px] w-full"
           />
         ) : (
           <div className="flex items-center gap-2">
