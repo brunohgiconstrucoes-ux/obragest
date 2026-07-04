@@ -72,7 +72,7 @@ export function CadastroCombobox({
         className="p-0 bg-[var(--color-surface)] border-[var(--color-border)]"
         style={{ width: 'var(--radix-popover-trigger-width)' }}
       >
-        <Command>
+        <Command shouldFilter={false}>
           <CommandInput
             placeholder="Buscar..."
             value={query}
