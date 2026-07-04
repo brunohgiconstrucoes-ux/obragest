@@ -83,43 +83,73 @@ function StatusBadge({ status }: { status: Medicao['status'] }) {
 
 // ── EditMedicaoForm ───────────────────────────────────────────────────────────
 
+type EditItemRow = MedicaoItem & { qtdEdit: string }
+
 function EditMedicaoForm({
   medicao,
   obra,
+  itensOriginais,
   onSaved,
   onCancel,
 }: {
   medicao: Medicao
   obra: Obra
-  onSaved: (updated: Medicao) => void
+  itensOriginais: MedicaoItem[]
+  onSaved: (updated: Medicao, updatedItens: MedicaoItem[]) => void
   onCancel: () => void
 }) {
   const { toast } = useToast()
   const [saving, setSaving] = useState(false)
-  const [valorBruto, setValorBruto] = useState((medicao.valor_bruto / 100).toFixed(2))
+  const [rows, setRows] = useState<EditItemRow[]>(() =>
+    itensOriginais.map(i => ({ ...i, qtdEdit: (i.quantidade_executada).toString() }))
+  )
+  const [periodoInicio, setPeriodoInicio] = useState(medicao.periodo_inicio)
+  const [periodoFim, setPeriodoFim] = useState(medicao.periodo_fim)
+  const [dataPrevista, setDataPrevista] = useState(medicao.data_prevista_recebimento ?? '')
 
   const caucaoPct = obra.aliquota_caucao ?? 0
   const issPct = obra.aliquota_iss ?? 0
   const inssPct = obra.aliquota_inss ?? 0
   const irrfPct = obra.aliquota_irrf ?? 0
 
-  const bruto = Math.round(parseFloat(valorBruto.replace(',', '.') || '0') * 100)
+  // Recalculate totals from edited rows
+  const bruto = rows.reduce((s, r) => {
+    const qtd = parseFloat(r.qtdEdit || '0')
+    return s + Math.round(qtd * r.valor_unitario)
+  }, 0)
   const retCaucao = Math.round(bruto * caucaoPct / 100)
   const retIss = Math.round(bruto * issPct / 100)
   const retInss = Math.round(bruto * inssPct / 100)
   const retIrrf = Math.round(bruto * irrfPct / 100)
-  const totalRet = retCaucao + retIss + retInss + retIrrf
-  const liquido = bruto - totalRet
+  const liquido = bruto - retCaucao - retIss - retInss - retIrrf
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  function setQtd(id: string, val: string) {
+    setRows(prev => prev.map(r => r.id === id ? { ...r, qtdEdit: val } : r))
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    const fd = new FormData(e.currentTarget)
     setSaving(true)
 
-    const updated = {
-      periodo_inicio: fd.get('periodo_inicio') as string,
-      periodo_fim: fd.get('periodo_fim') as string,
-      data_prevista_recebimento: (fd.get('data_prevista_recebimento') as string) || null,
+    // Build updated items
+    const updatedItens = rows.map(r => {
+      const qtd = parseFloat(r.qtdEdit || '0')
+      return { ...r, quantidade_executada: qtd, valor_total: Math.round(qtd * r.valor_unitario) }
+    })
+
+    // Update each medicao_item (view vw_planilha_saldo recalculates accumulation automatically)
+    const itemUpdates = updatedItens.map(r =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (supabase.from('medicao_itens') as any).update({
+        quantidade_executada: r.quantidade_executada,
+        valor_total: r.valor_total,
+      }).eq('id', r.id)
+    )
+
+    const medicaoUpdate = {
+      periodo_inicio: periodoInicio,
+      periodo_fim: periodoFim,
+      data_prevista_recebimento: dataPrevista || null,
       valor_bruto: bruto,
       retencao_caucao: retCaucao,
       retencao_iss: retIss,
@@ -128,76 +158,105 @@ function EditMedicaoForm({
       valor_liquido: liquido,
     }
 
-    const { error } = await supabase.from('medicoes').update(updated).eq('id', medicao.id)
+    await Promise.all(itemUpdates)
+    const { error } = await supabase.from('medicoes').update(medicaoUpdate).eq('id', medicao.id)
+
     if (error) {
       toast({ description: 'Erro ao salvar medição.', variant: 'destructive' })
       setSaving(false)
       return
     }
 
-    // Atualiza lançamento no fluxo de caixa vinculado
-    await supabase
-      .from('fluxo_caixa')
+    await supabase.from('fluxo_caixa')
       .update({ valor: liquido })
       .eq('origem_id', medicao.id)
       .eq('origem', 'medicao')
 
-    toast({ description: 'Medição atualizada.' })
-    onSaved({ ...medicao, ...updated })
+    toast({ description: 'Medição atualizada com sucesso.' })
+    onSaved({ ...medicao, ...medicaoUpdate }, updatedItens)
     setSaving(false)
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+    <form onSubmit={handleSubmit} className="space-y-4 mt-2 max-h-[80vh] overflow-y-auto pr-1">
       {/* Período */}
       <div className="grid grid-cols-2 gap-3">
         <div>
           <Label className="text-xs text-[var(--color-muted)]">Período início *</Label>
-          <Input name="periodo_inicio" type="date" defaultValue={medicao.periodo_inicio} className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]" required />
+          <Input type="date" value={periodoInicio} onChange={e => setPeriodoInicio(e.target.value)} className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]" required />
         </div>
         <div>
           <Label className="text-xs text-[var(--color-muted)]">Período fim *</Label>
-          <Input name="periodo_fim" type="date" defaultValue={medicao.periodo_fim} className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]" required />
+          <Input type="date" value={periodoFim} onChange={e => setPeriodoFim(e.target.value)} className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]" required />
         </div>
         <div className="col-span-2">
           <Label className="text-xs text-[var(--color-muted)]">Data prevista de recebimento</Label>
-          <Input name="data_prevista_recebimento" type="date" defaultValue={medicao.data_prevista_recebimento ?? ''} className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]" />
+          <Input type="date" value={dataPrevista} onChange={e => setDataPrevista(e.target.value)} className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]" />
         </div>
       </div>
 
-      {/* Valores financeiros */}
-      <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] p-4">
-        <p className="text-xs font-semibold text-[var(--color-muted)] uppercase tracking-wide mb-3">Valores financeiros</p>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="col-span-2">
-            <Label className="text-xs text-[var(--color-muted)]">Valor Bruto (R$) *</Label>
-            <Input
-              type="number"
-              step="0.01"
-              min="0"
-              value={valorBruto}
-              onChange={e => setValorBruto(e.target.value)}
-              className="mt-1 bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-text)]"
-              required
-            />
+      {/* Itens editáveis */}
+      {rows.length > 0 && (
+        <div className="rounded-lg border border-[var(--color-border)] overflow-hidden">
+          <div className="bg-[var(--color-surface-2)] px-3 py-2 text-xs font-semibold text-[var(--color-muted)] uppercase tracking-wide">
+            Itens medidos — edite as quantidades
           </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-[var(--color-border)] bg-[var(--color-surface-2)]">
+                <th className="text-left px-3 py-2 text-xs text-[var(--color-muted)]">Descrição</th>
+                <th className="text-center px-3 py-2 text-xs text-[var(--color-muted)]">Un.</th>
+                <th className="text-right px-3 py-2 text-xs text-[var(--color-muted)]">V. Unit.</th>
+                <th className="text-right px-3 py-2 text-xs text-[var(--color-muted)] w-28">Qtd. executada</th>
+                <th className="text-right px-3 py-2 text-xs text-[var(--color-muted)]">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(r => {
+                const qtd = parseFloat(r.qtdEdit || '0')
+                const total = Math.round(qtd * r.valor_unitario)
+                return (
+                  <tr key={r.id} className="border-b border-[var(--color-border)] last:border-0">
+                    <td className="px-3 py-2 text-[var(--color-text)]">
+                      <div>{r.descricao}</div>
+                      {r.codigo && <div className="text-xs text-[var(--color-muted)]">{r.codigo}</div>}
+                    </td>
+                    <td className="px-3 py-2 text-center text-[var(--color-muted)] text-xs">{r.unidade}</td>
+                    <td className="px-3 py-2 text-right text-[var(--color-muted)]"><ValorMonetario value={r.valor_unitario} /></td>
+                    <td className="px-3 py-2">
+                      <Input
+                        type="number"
+                        step="any"
+                        min="0"
+                        value={r.qtdEdit}
+                        onChange={e => setQtd(r.id, e.target.value)}
+                        className="h-7 text-xs text-right bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]"
+                      />
+                    </td>
+                    <td className="px-3 py-2 text-right font-medium"><ValorMonetario value={total} /></td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         </div>
-        {/* Preview de retenções */}
-        {bruto > 0 && (
-          <div className="mt-3 space-y-1.5 text-sm border-t border-[var(--color-border)] pt-3">
-            {caucaoPct > 0 && <div className="flex justify-between"><span className="text-[var(--color-muted)]">(−) Caução {caucaoPct}%</span><ValorMonetario value={retCaucao} className="text-[var(--color-danger)]" /></div>}
-            {issPct > 0 && <div className="flex justify-between"><span className="text-[var(--color-muted)]">(−) ISS {issPct}%</span><ValorMonetario value={retIss} className="text-[var(--color-danger)]" /></div>}
-            {inssPct > 0 && <div className="flex justify-between"><span className="text-[var(--color-muted)]">(−) INSS {inssPct}%</span><ValorMonetario value={retInss} className="text-[var(--color-danger)]" /></div>}
-            {irrfPct > 0 && <div className="flex justify-between"><span className="text-[var(--color-muted)]">(−) IRRF {irrfPct}%</span><ValorMonetario value={retIrrf} className="text-[var(--color-danger)]" /></div>}
-            <div className="flex justify-between font-bold border-t border-[var(--color-border)] pt-2">
-              <span className="text-[var(--color-text)]">Valor Líquido</span>
-              <ValorMonetario value={liquido} className="text-[var(--color-success)] text-base" />
-            </div>
-          </div>
-        )}
+      )}
+
+      {/* Resumo financeiro recalculado */}
+      <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] p-4 text-sm space-y-1.5">
+        <p className="text-xs font-semibold text-[var(--color-muted)] uppercase tracking-wide mb-2">Resumo financeiro</p>
+        <div className="flex justify-between"><span className="text-[var(--color-muted)]">Valor Bruto</span><ValorMonetario value={bruto} /></div>
+        {caucaoPct > 0 && <div className="flex justify-between"><span className="text-[var(--color-muted)]">(−) Caução {caucaoPct}%</span><ValorMonetario value={retCaucao} className="text-[var(--color-danger)]" /></div>}
+        {issPct > 0 && <div className="flex justify-between"><span className="text-[var(--color-muted)]">(−) ISS {issPct}%</span><ValorMonetario value={retIss} className="text-[var(--color-danger)]" /></div>}
+        {inssPct > 0 && <div className="flex justify-between"><span className="text-[var(--color-muted)]">(−) INSS {inssPct}%</span><ValorMonetario value={retInss} className="text-[var(--color-danger)]" /></div>}
+        {irrfPct > 0 && <div className="flex justify-between"><span className="text-[var(--color-muted)]">(−) IRRF {irrfPct}%</span><ValorMonetario value={retIrrf} className="text-[var(--color-danger)]" /></div>}
+        <div className="flex justify-between font-bold border-t border-[var(--color-border)] pt-2">
+          <span className="text-[var(--color-text)]">Valor Líquido</span>
+          <ValorMonetario value={liquido} className="text-[var(--color-success)] text-base" />
+        </div>
       </div>
 
-      <div className="flex justify-end gap-2">
+      <div className="flex justify-end gap-2 pb-2">
         <Button type="button" variant="outline" onClick={onCancel} className="border-[var(--color-border)] text-[var(--color-text)]">Cancelar</Button>
         <Button type="submit" disabled={saving} className="bg-[var(--color-primary)] hover:bg-[var(--color-primary-dim)] text-black">{saving ? 'Salvando…' : 'Salvar'}</Button>
       </div>
@@ -721,7 +780,13 @@ export function MedicaoDetailPage() {
           <DialogHeader>
             <DialogTitle className="text-[var(--color-text)]">Editar Medição #{medicao.numero}</DialogTitle>
           </DialogHeader>
-          <EditMedicaoForm medicao={medicao} obra={obra} onSaved={(updated) => { setMedicao(updated); setShowEditDialog(false) }} onCancel={() => setShowEditDialog(false)} />
+          <EditMedicaoForm
+            medicao={medicao}
+            obra={obra}
+            itensOriginais={itens}
+            onSaved={(updated, updatedItens) => { setMedicao(updated); setItens(updatedItens); setShowEditDialog(false) }}
+            onCancel={() => setShowEditDialog(false)}
+          />
         </DialogContent>
       </Dialog>
     </div>
