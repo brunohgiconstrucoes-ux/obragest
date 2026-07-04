@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { ArrowLeft, Edit, Plus, FileText, ClipboardList, Wrench, Users, TrendingUp, ExternalLink, Package, Gauge, Sparkles, Upload } from 'lucide-react'
+import { ArrowLeft, Edit, Plus, FileText, ClipboardList, Wrench, Users, TrendingUp, ExternalLink, Package, Gauge, Sparkles, Upload, Trash2, Pencil } from 'lucide-react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
@@ -185,15 +185,26 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 // ── Material Dialog ──────────────────────────────────────────────────────────
 
-function MaterialDialog({ obraId, onSaved }: { obraId: string; onSaved: () => void }) {
+function MaterialDialog({ obraId, material, onSaved }: { obraId: string; material?: Material; onSaved: () => void }) {
   const { user } = useAuth()
   const { toast } = useToast()
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
+  const isEdit = !!material
 
   const { register, handleSubmit, reset, control, formState: { errors } } = useForm<MaterialFormValues>({
     resolver: zodResolver(materialSchema),
-    defaultValues: {
+    defaultValues: isEdit ? {
+      fornecedor: material.fornecedor,
+      item: material.item,
+      categoria: material.categoria,
+      quantidade: material.quantidade ?? '',
+      unidade: material.unidade ?? '',
+      valor_total_reais: material.valor_total / 100,
+      data_compra: material.data_compra,
+      forma_pagamento: material.forma_pagamento,
+      observacao: material.observacao ?? '',
+    } : {
       data_compra: todayStr(),
       categoria: 'outros',
       forma_pagamento: 'avista',
@@ -204,6 +215,34 @@ function MaterialDialog({ obraId, onSaved }: { obraId: string; onSaved: () => vo
     setSaving(true)
     const valorCentavos = Math.round(values.valor_total_reais * 100)
     const quantidadeNum = values.quantidade === '' || values.quantidade == null ? null : Number(values.quantidade)
+
+    if (isEdit) {
+      const { error } = await supabase.from('materiais').update({
+        fornecedor: values.fornecedor,
+        item: values.item,
+        categoria: values.categoria as MaterialCategoria,
+        quantidade: quantidadeNum,
+        unidade: values.unidade || null,
+        valor_total: valorCentavos,
+        data_compra: values.data_compra,
+        forma_pagamento: values.forma_pagamento as FormaPagamento,
+        observacao: values.observacao || null,
+      }).eq('id', material.id)
+      if (error) {
+        toast({ description: 'Erro ao atualizar material.', variant: 'destructive' })
+      } else {
+        await supabase.from('fluxo_caixa').update({
+          descricao: `Material: ${values.item} (${values.fornecedor})`,
+          valor: valorCentavos,
+          data_lancamento: values.data_compra,
+        }).eq('origem_id', material.id).eq('origem', 'material')
+        toast({ description: 'Material atualizado.' })
+        setOpen(false)
+        onSaved()
+      }
+      setSaving(false)
+      return
+    }
 
     const { data: mat, error: matErr } = await supabase
       .from('materiais')
@@ -264,14 +303,20 @@ function MaterialDialog({ obraId, onSaved }: { obraId: string; onSaved: () => vo
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" className="bg-[var(--color-primary)] hover:bg-[var(--color-primary-dim)] text-black">
-          <Plus className="w-4 h-4 mr-1" />
-          Lançar material
-        </Button>
+        {isEdit ? (
+          <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-[var(--color-muted)] hover:text-[var(--color-primary)]">
+            <Pencil className="w-3.5 h-3.5" />
+          </Button>
+        ) : (
+          <Button size="sm" className="bg-[var(--color-primary)] hover:bg-[var(--color-primary-dim)] text-black">
+            <Plus className="w-4 h-4 mr-1" />
+            Lançar material
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-text)] max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-[var(--color-text)]">Lançar Material</DialogTitle>
+          <DialogTitle className="text-[var(--color-text)]">{isEdit ? 'Editar Material' : 'Lançar Material'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
           <div className="grid grid-cols-2 gap-3">
@@ -359,6 +404,55 @@ function MaterialDialog({ obraId, onSaved }: { obraId: string; onSaved: () => vo
             </Button>
           </div>
         </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ── Excluir Obra Dialog ───────────────────────────────────────────────────────
+
+function ExcluirObraDialog({ obraId, obraNome, onExcluido }: { obraId: string; obraNome: string; onExcluido: () => void }) {
+  const { toast } = useToast()
+  const [open, setOpen] = useState(false)
+  const [excluindo, setExcluindo] = useState(false)
+
+  async function handleExcluir() {
+    setExcluindo(true)
+    const { error } = await supabase.from('obras').delete().eq('id', obraId)
+    if (error) {
+      toast({ description: 'Erro ao excluir obra.', variant: 'destructive' })
+      setExcluindo(false)
+      return
+    }
+    toast({ description: 'Obra excluída.' })
+    setOpen(false)
+    onExcluido()
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline" className="border-red-800 text-red-400 hover:bg-red-900/20">
+          <Trash2 className="w-4 h-4 mr-1" />
+          Excluir obra
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-text)] max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="text-[var(--color-text)]">Excluir obra</DialogTitle>
+          <DialogDescription className="text-[var(--color-muted)]">
+            Esta ação é irreversível. Todos os dados vinculados (medições, materiais, mão de obra, fluxo de caixa) serão excluídos.
+          </DialogDescription>
+        </DialogHeader>
+        <p className="text-sm text-[var(--color-text)] font-medium mt-2">"{obraNome}"</p>
+        <DialogFooter className="mt-4">
+          <Button variant="outline" onClick={() => setOpen(false)} className="border-[var(--color-border)] text-[var(--color-text)]">
+            Cancelar
+          </Button>
+          <Button disabled={excluindo} onClick={handleExcluir} className="bg-red-600 hover:bg-red-700 text-white">
+            {excluindo ? 'Excluindo…' : 'Excluir definitivamente'}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
@@ -660,6 +754,18 @@ export function ObraDetailPage() {
     setQuickSaving(false)
   }
 
+  async function handleExcluirMaterial(matId: string) {
+    if (!window.confirm('Excluir este material? O lançamento no fluxo de caixa também será removido.')) return
+    await supabase.from('fluxo_caixa').delete().eq('origem_id', matId).eq('origem', 'material')
+    const { error } = await supabase.from('materiais').delete().eq('id', matId)
+    if (error) {
+      toast({ description: 'Erro ao excluir material.', variant: 'destructive' })
+    } else {
+      toast({ description: 'Material excluído.' })
+      await loadMateriais()
+    }
+  }
+
   // ── Loaders ──
   async function loadObra() {
     if (!id || !user) return
@@ -842,12 +948,15 @@ export function ObraDetailPage() {
             )}
           </div>
         </div>
-        <Button asChild size="sm" variant="outline" className="border-[var(--color-border)] text-[var(--color-text)] hover:bg-[var(--color-surface-2)] shrink-0">
-          <Link to={`/obras/${obra.id}/editar`}>
-            <Edit className="w-4 h-4 mr-1" />
-            Editar obra
-          </Link>
-        </Button>
+        <div className="flex gap-2 shrink-0">
+          <Button asChild size="sm" variant="outline" className="border-[var(--color-border)] text-[var(--color-text)] hover:bg-[var(--color-surface-2)]">
+            <Link to={`/obras/${obra.id}/editar`}>
+              <Edit className="w-4 h-4 mr-1" />
+              Editar obra
+            </Link>
+          </Button>
+          <ExcluirObraDialog obraId={obra.id} obraNome={obra.nome} onExcluido={() => navigate('/obras')} />
+        </div>
       </div>
 
       {/* Tabs */}
@@ -859,15 +968,15 @@ export function ObraDetailPage() {
           </TabsTrigger>
           <TabsTrigger value="planilha" className="data-[state=active]:bg-[var(--color-surface-2)] data-[state=active]:text-[var(--color-primary)] text-[var(--color-muted)]">
             <FileText className="w-3.5 h-3.5 mr-1.5" />
-            Planilha
+            Planilha de Serviços
           </TabsTrigger>
           <TabsTrigger value="medicoes" className="data-[state=active]:bg-[var(--color-surface-2)] data-[state=active]:text-[var(--color-primary)] text-[var(--color-muted)]">
             <ClipboardList className="w-3.5 h-3.5 mr-1.5" />
-            Medições
+            Medições / Faturamento
           </TabsTrigger>
           <TabsTrigger value="materiais" className="data-[state=active]:bg-[var(--color-surface-2)] data-[state=active]:text-[var(--color-primary)] text-[var(--color-muted)]">
             <Wrench className="w-3.5 h-3.5 mr-1.5" />
-            Materiais
+            Compras / Materiais
           </TabsTrigger>
           <TabsTrigger value="mao-de-obra" className="data-[state=active]:bg-[var(--color-surface-2)] data-[state=active]:text-[var(--color-primary)] text-[var(--color-muted)]">
             <Users className="w-3.5 h-3.5 mr-1.5" />
@@ -875,15 +984,15 @@ export function ObraDetailPage() {
           </TabsTrigger>
           <TabsTrigger value="fluxo" className="data-[state=active]:bg-[var(--color-surface-2)] data-[state=active]:text-[var(--color-primary)] text-[var(--color-muted)]">
             <TrendingUp className="w-3.5 h-3.5 mr-1.5" />
-            Fluxo
+            Fluxo de Caixa
           </TabsTrigger>
           <TabsTrigger value="estoque" className="data-[state=active]:bg-[var(--color-surface-2)] data-[state=active]:text-[var(--color-primary)] text-[var(--color-muted)]">
             <Package className="w-3.5 h-3.5 mr-1.5" />
-            Estoque
+            Estoque de Materiais
           </TabsTrigger>
           <TabsTrigger value="equipamentos" className="data-[state=active]:bg-[var(--color-surface-2)] data-[state=active]:text-[var(--color-primary)] text-[var(--color-muted)]">
             <Gauge className="w-3.5 h-3.5 mr-1.5" />
-            Equipamentos
+            Equipamentos Alocados
           </TabsTrigger>
         </TabsList>
 
@@ -1098,6 +1207,7 @@ export function ObraDetailPage() {
                     <th className="text-left px-3 py-2 text-xs text-[var(--color-muted)] font-medium">Categoria</th>
                     <th className="text-right px-3 py-2 text-xs text-[var(--color-muted)] font-medium">Valor</th>
                     <th className="text-center px-3 py-2 text-xs text-[var(--color-muted)] font-medium">Data</th>
+                    <th className="px-3 py-2" />
                   </tr>
                 </thead>
                 <tbody>
@@ -1108,6 +1218,14 @@ export function ObraDetailPage() {
                       <td className="px-3 py-2 text-[var(--color-muted)]">{categoriaLabel[m.categoria]}</td>
                       <td className="px-3 py-2 text-right"><ValorMonetario value={m.valor_total} /></td>
                       <td className="px-3 py-2 text-center text-[var(--color-muted)]">{fmtDate(m.data_compra)}</td>
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-1 justify-end">
+                          <MaterialDialog obraId={obra.id} material={m} onSaved={loadMateriais} />
+                          <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-[var(--color-muted)] hover:text-red-400" onClick={() => handleExcluirMaterial(m.id)}>
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
