@@ -21,6 +21,8 @@ import { Label } from '@/components/ui/label'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { ValorMonetario } from '@/components/shared/ValorMonetario'
 import { extrairDadosNf } from '@/lib/gemini'
+import { CadastroCombobox } from '@/components/shared/CadastroCombobox'
+import { useCadastros } from '@/hooks/useCadastros'
 import type {
   Obra,
   Medicao,
@@ -210,6 +212,9 @@ function MaterialDialog({ obraId, material, onSaved }: { obraId: string; materia
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const isEdit = !!material
+  const { fornecedores: cadastroFornecedores, materiais: catalogoMateriais, addFornecedor, addMaterial } = useCadastros()
+  const fornecedorItemsDlg = cadastroFornecedores.map(f => ({ value: f.id, label: f.nome }))
+  const materialItemsDlg = catalogoMateriais.map(m => ({ value: m.id, label: m.descricao, sub: m.unidade }))
 
   const parsed = isEdit ? parseParcelas(material.observacao) : { numero: 1, pagas: 0, obs: '' }
 
@@ -351,12 +356,29 @@ function MaterialDialog({ obraId, material, onSaved }: { obraId: string; materia
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
               <Label className="text-[var(--color-muted)] text-xs">Fornecedor *</Label>
-              <Input {...register('fornecedor')} className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]" />
+              <CadastroCombobox
+                items={fornecedorItemsDlg}
+                value={watch('fornecedor')}
+                onChange={v => { reset({ ...watch(), fornecedor: v }) }}
+                onCreateNew={addFornecedor}
+                placeholder="Nome do fornecedor"
+                className="mt-1 w-full"
+              />
               {errors.fornecedor && <p className="text-xs text-[var(--color-danger)] mt-0.5">{errors.fornecedor.message}</p>}
             </div>
             <div className="col-span-2">
               <Label className="text-[var(--color-muted)] text-xs">Item *</Label>
-              <Input {...register('item')} className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]" />
+              <CadastroCombobox
+                items={materialItemsDlg}
+                value={watch('item')}
+                onChange={v => {
+                  const found = catalogoMateriais.find(m => m.descricao === v)
+                  reset({ ...watch(), item: v, unidade: found?.unidade ?? watch('unidade') })
+                }}
+                onCreateNew={nome => addMaterial(nome)}
+                placeholder="Descrição do material"
+                className="mt-1 w-full"
+              />
               {errors.item && <p className="text-xs text-[var(--color-danger)] mt-0.5">{errors.item.message}</p>}
             </div>
             <div>
@@ -740,6 +762,11 @@ export function ObraDetailPage() {
   const [sortMateriais, setSortMateriais] = useState<{ col: string; dir: 'asc' | 'desc' } | null>(null)
   const [searchMao, setSearchMao] = useState('')
   const [sortMao, setSortMao] = useState<{ col: string; dir: 'asc' | 'desc' } | null>(null)
+
+  // ── Cadastros (fornecedores/materiais para autocomplete) ──
+  const { fornecedores: cadastroFornecedores, materiais: catalogoMateriais, addFornecedor, addMaterial } = useCadastros()
+  const fornecedorItems = cadastroFornecedores.map(f => ({ value: f.id, label: f.nome }))
+  const materialItems = catalogoMateriais.map(m => ({ value: m.id, label: m.descricao, sub: m.unidade }))
 
   // ── Quick-add material ──
   const [quickExpanded, setQuickExpanded] = useState(false)
@@ -1310,11 +1337,25 @@ export function ObraDetailPage() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 items-end">
                 <div className="space-y-1">
                   <Label className="text-xs text-[var(--color-muted)]">Fornecedor *</Label>
-                  <Input {...quickForm.register('fornecedor')} placeholder="Nome" className="h-8 text-sm bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-text)]" />
+                  <CadastroCombobox
+                    items={fornecedorItems}
+                    value={quickForm.watch('fornecedor')}
+                    onChange={v => quickForm.setValue('fornecedor', v)}
+                    onCreateNew={addFornecedor}
+                    placeholder="Nome"
+                    className="h-8 text-sm w-full"
+                  />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-[var(--color-muted)]">Item *</Label>
-                  <Input {...quickForm.register('item')} placeholder="Descrição" className="h-8 text-sm bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-text)]" />
+                  <CadastroCombobox
+                    items={materialItems}
+                    value={quickForm.watch('item')}
+                    onChange={v => quickForm.setValue('item', v)}
+                    onCreateNew={nome => addMaterial(nome)}
+                    placeholder="Descrição"
+                    className="h-8 text-sm w-full"
+                  />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-[var(--color-muted)]">Valor total (R$) *</Label>

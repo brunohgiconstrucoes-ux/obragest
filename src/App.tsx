@@ -24,6 +24,7 @@ import { AlmoxarifadoPage } from '@/pages/AlmoxarifadoPage'
 import { EquipamentosPage } from '@/pages/EquipamentosPage'
 import { AlertasPage } from '@/pages/AlertasPage'
 import { DrePage } from '@/pages/DrePage'
+import { CadastrosPage } from '@/pages/CadastrosPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -73,6 +74,7 @@ export default function App() {
           <Route path="/equipamentos" element={<EquipamentosPage />} />
           <Route path="/alertas" element={<AlertasPage />} />
           <Route path="/dre" element={<DrePage />} />
+          <Route path="/cadastros" element={<CadastrosPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

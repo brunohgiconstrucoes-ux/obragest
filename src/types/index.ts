@@ -25,6 +25,40 @@ export type FluxoEscopo = 'pj_obra' | 'pj_admin' | 'pf'
 
 export type FluxoOrigem = 'medicao' | 'material' | 'mao_de_obra' | 'manual'
 
+export type FornecedorCategoria = 'material' | 'servico' | 'ambos'
+
+export type CadastroFornecedor = {
+  id: string
+  user_id: string
+  nome: string
+  cpf_cnpj: string | null
+  telefone: string | null
+  email: string | null
+  categoria: FornecedorCategoria
+  observacao: string | null
+  created_at: string
+}
+
+export type CadastroMaterial = {
+  id: string
+  user_id: string
+  descricao: string
+  unidade: string
+  categoria: MaterialCategoria
+  created_at: string
+}
+
+export type CadastroPrestador = {
+  id: string
+  user_id: string
+  nome: string
+  cpf: string | null
+  funcao: string | null
+  telefone: string | null
+  observacao: string | null
+  created_at: string
+}
+
 export type MaterialCategoria =
   | 'cimento'
   | 'aco'
