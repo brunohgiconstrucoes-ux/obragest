@@ -981,8 +981,8 @@ export function ObraDetailPage() {
     const dataReal = novoStatus === 'realizado' ? todayStr() : null
     await supabase.from('mao_de_obra').update({ status: novoStatus, data_pagamento: dataReal ?? mo.data_pagamento })
       .eq('id', mo.id).eq('user_id', user.id)
-    await supabase.from('fluxo_caixa').update({ status: novoStatus, data_realizada: dataReal })
-      .eq('origem_id', mo.id).eq('origem', 'mao_obra')
+    await supabase.from('fluxo_caixa').update({ status: novoStatus, data_realizada: dataReal as string })
+      .eq('origem_id', mo.id).eq('origem', 'mao_de_obra' as FluxoOrigem)
     loadMaoDeObra()
   }
 
