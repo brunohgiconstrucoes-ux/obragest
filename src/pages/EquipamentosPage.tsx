@@ -224,67 +224,105 @@ export function EquipamentosPage() {
             <Wrench className="w-10 h-10 mx-auto mb-3 text-[var(--color-muted)]" />
             <p className="text-[var(--color-muted)] text-sm">Nenhum equipamento cadastrado ainda.</p>
           </div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-[var(--color-border)] bg-[var(--color-surface-2)]">
-                <th className="text-left px-4 py-3 text-[var(--color-muted)] font-medium">Equipamento</th>
-                <th className="text-left px-4 py-3 text-[var(--color-muted)] font-medium">Tipo</th>
-                <th className="text-left px-4 py-3 text-[var(--color-muted)] font-medium">Status</th>
-                <th className="text-left px-4 py-3 text-[var(--color-muted)] font-medium">Obra atual</th>
-                <th className="text-right px-4 py-3 text-[var(--color-muted)] font-medium">Custo/dia</th>
-                <th className="text-right px-4 py-3 text-[var(--color-muted)] font-medium">Custo acumulado</th>
-                <th className="text-left px-4 py-3 text-[var(--color-muted)] font-medium">Próx. manutenção</th>
-                <th className="px-4 py-3"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {equipamentos.map(e => {
-                const diaria = e.alocacao_atual?.custo_diaria_override ?? e.custo_diaria
-                return (
-                  <tr key={e.id} className="border-b border-[var(--color-border)] last:border-0 hover:bg-[var(--color-surface-2)] transition-colors">
-                    <td className="px-4 py-3 font-medium">
-                      <div>{e.nome}</div>
-                      {e.numero_serie && <div className="text-xs text-[var(--color-muted)]">Série: {e.numero_serie}</div>}
-                    </td>
-                    <td className="px-4 py-3 text-[var(--color-muted)]">{tipoLabel[e.tipo]}</td>
-                    <td className="px-4 py-3">{statusBadge(e.status, e.proxima_manutencao)}</td>
-                    <td className="px-4 py-3 text-[var(--color-muted)] text-sm">
-                      {e.alocacao_atual
-                        ? <><span className="text-[var(--color-text)]">{e.alocacao_atual.obras?.nome ?? '—'}</span><br /><span className="text-xs">desde {format(parseISO(e.alocacao_atual.data_inicio), 'dd/MM/yy', { locale: ptBR })}</span></>
-                        : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <ValorMonetario value={diaria} />
-                    </td>
-                    <td className="px-4 py-3 text-right font-medium">
-                      {e.alocacao_atual
-                        ? <ValorMonetario value={custoAcumulado(e)} className="text-[var(--color-warning)]" />
-                        : <span className="text-[var(--color-muted)]">—</span>}
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      {e.proxima_manutencao
-                        ? <span className={parseISO(e.proxima_manutencao) < new Date() ? 'text-[var(--color-danger)]' : 'text-[var(--color-muted)]'}>
-                            {format(parseISO(e.proxima_manutencao), 'dd/MM/yyyy', { locale: ptBR })}
-                          </span>
-                        : <span className="text-[var(--color-muted)]">—</span>}
-                    </td>
-                    <td className="px-4 py-3">
-                      {e.alocacao_atual && (
-                        <Button size="sm" variant="outline"
-                          className="border-[var(--color-border)] text-[var(--color-text)] text-xs"
-                          onClick={() => devolver(e)}
-                        >
-                          Devolver
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        )}
+        ) : (() => {
+          const grupos: { emoji: string; label: string; items: EquipComAlocacao[]; rowClass: string }[] = [
+            {
+              emoji: '🔴',
+              label: 'Manutenção vencida',
+              rowClass: 'bg-[var(--color-danger)]/5',
+              items: equipamentos.filter(e => e.proxima_manutencao && parseISO(e.proxima_manutencao) < new Date()),
+            },
+            {
+              emoji: '🔧',
+              label: 'Em manutenção',
+              rowClass: 'bg-[var(--color-warning)]/5',
+              items: equipamentos.filter(e => e.status === 'manutencao' && !(e.proxima_manutencao && parseISO(e.proxima_manutencao) < new Date())),
+            },
+            {
+              emoji: '🔄',
+              label: 'Alocados em obra',
+              rowClass: '',
+              items: equipamentos.filter(e => e.status === 'alocado' && !(e.proxima_manutencao && parseISO(e.proxima_manutencao) < new Date())),
+            },
+            {
+              emoji: '✅',
+              label: 'Disponíveis',
+              rowClass: 'bg-[var(--color-success)]/5',
+              items: equipamentos.filter(e => e.status === 'disponivel' && !(e.proxima_manutencao && parseISO(e.proxima_manutencao) < new Date())),
+            },
+          ].filter(g => g.items.length > 0)
+
+          return (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[var(--color-border)] bg-[var(--color-surface-2)]">
+                  <th className="text-left px-4 py-3 text-[var(--color-muted)] font-medium">Equipamento</th>
+                  <th className="text-left px-4 py-3 text-[var(--color-muted)] font-medium">Tipo</th>
+                  <th className="text-left px-4 py-3 text-[var(--color-muted)] font-medium">Status</th>
+                  <th className="text-left px-4 py-3 text-[var(--color-muted)] font-medium">Obra atual</th>
+                  <th className="text-right px-4 py-3 text-[var(--color-muted)] font-medium">Custo/dia</th>
+                  <th className="text-right px-4 py-3 text-[var(--color-muted)] font-medium">Custo acumulado</th>
+                  <th className="text-left px-4 py-3 text-[var(--color-muted)] font-medium">Próx. manutenção</th>
+                  <th className="px-4 py-3"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {grupos.map(grupo => (
+                  <>
+                    <tr key={`grupo-${grupo.label}`} className="border-b border-[var(--color-border)] bg-[var(--color-surface-2)]">
+                      <td colSpan={8} className="px-4 py-2 text-xs font-bold text-[var(--color-text)] uppercase tracking-wider">
+                        {grupo.emoji} {grupo.label} <span className="text-[var(--color-muted)] font-normal normal-case">({grupo.items.length})</span>
+                      </td>
+                    </tr>
+                    {grupo.items.map(e => {
+                      const diaria = e.alocacao_atual?.custo_diaria_override ?? e.custo_diaria
+                      return (
+                        <tr key={e.id} className={`border-b border-[var(--color-border)] last:border-0 hover:bg-[var(--color-surface-2)] transition-colors ${grupo.rowClass}`}>
+                          <td className="px-4 py-3 font-medium">
+                            <div>{e.nome}</div>
+                            {e.numero_serie && <div className="text-xs text-[var(--color-muted)]">Série: {e.numero_serie}</div>}
+                          </td>
+                          <td className="px-4 py-3 text-[var(--color-muted)]">{tipoLabel[e.tipo]}</td>
+                          <td className="px-4 py-3">{statusBadge(e.status, e.proxima_manutencao)}</td>
+                          <td className="px-4 py-3 text-[var(--color-muted)] text-sm">
+                            {e.alocacao_atual
+                              ? <><span className="text-[var(--color-text)]">{e.alocacao_atual.obras?.nome ?? '—'}</span><br /><span className="text-xs">desde {format(parseISO(e.alocacao_atual.data_inicio), 'dd/MM/yy', { locale: ptBR })}</span></>
+                              : '—'}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <ValorMonetario value={diaria} />
+                          </td>
+                          <td className="px-4 py-3 text-right font-medium">
+                            {e.alocacao_atual
+                              ? <ValorMonetario value={custoAcumulado(e)} className="text-[var(--color-warning)]" />
+                              : <span className="text-[var(--color-muted)]">—</span>}
+                          </td>
+                          <td className="px-4 py-3 text-sm">
+                            {e.proxima_manutencao
+                              ? <span className={parseISO(e.proxima_manutencao) < new Date() ? 'text-[var(--color-danger)]' : 'text-[var(--color-muted)]'}>
+                                  {format(parseISO(e.proxima_manutencao), 'dd/MM/yyyy', { locale: ptBR })}
+                                </span>
+                              : <span className="text-[var(--color-muted)]">—</span>}
+                          </td>
+                          <td className="px-4 py-3">
+                            {e.alocacao_atual && (
+                              <Button size="sm" variant="outline"
+                                className="border-[var(--color-border)] text-[var(--color-text)] text-xs"
+                                onClick={() => devolver(e)}
+                              >
+                                Devolver
+                              </Button>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </>
+                ))}
+              </tbody>
+            </table>
+          )
+        })()}
       </div>
 
       {/* Dialog: Novo equipamento */}

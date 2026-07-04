@@ -685,6 +685,12 @@ export function ObraDetailPage() {
   const [equipamentosObra, setEquipamentosObra] = useState<{ nome: string; tipo: string; data_inicio: string; custo_diaria: number; custo_diaria_override: number | null; dias: number }[]>([])
   const [loadingEquipamentos, setLoadingEquipamentos] = useState(false)
 
+  // ── Search / sort ──
+  const [searchMateriais, setSearchMateriais] = useState('')
+  const [sortMateriais, setSortMateriais] = useState<{ col: string; dir: 'asc' | 'desc' } | null>(null)
+  const [searchMao, setSearchMao] = useState('')
+  const [sortMao, setSortMao] = useState<{ col: string; dir: 'asc' | 'desc' } | null>(null)
+
   // ── Quick-add material ──
   const [quickExpanded, setQuickExpanded] = useState(false)
   const [quickSaving, setQuickSaving] = useState(false)
@@ -764,6 +770,46 @@ export function ObraDetailPage() {
       toast({ description: 'Material excluído.' })
       await loadMateriais()
     }
+  }
+
+  // ── Sort/filter helpers ──
+  function sortAndFilter<T extends Record<string, unknown>>(
+    items: T[],
+    search: string,
+    searchFields: (keyof T)[],
+    sort: { col: string; dir: 'asc' | 'desc' } | null,
+  ): T[] {
+    let result = items
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      result = result.filter(item =>
+        searchFields.some(f => String(item[f] ?? '').toLowerCase().includes(q))
+      )
+    }
+    if (sort) {
+      result = [...result].sort((a, b) => {
+        const av = a[sort.col as keyof T]
+        const bv = b[sort.col as keyof T]
+        if (av == null) return 1
+        if (bv == null) return -1
+        const cmp = av < bv ? -1 : av > bv ? 1 : 0
+        return sort.dir === 'asc' ? cmp : -cmp
+      })
+    }
+    return result
+  }
+
+  function toggleSort(current: { col: string; dir: 'asc' | 'desc' } | null, col: string, set: (v: { col: string; dir: 'asc' | 'desc' } | null) => void) {
+    if (current?.col === col) {
+      set(current.dir === 'asc' ? { col, dir: 'desc' } : null)
+    } else {
+      set({ col, dir: 'asc' })
+    }
+  }
+
+  function SortIcon({ col, sort }: { col: string; sort: { col: string; dir: 'asc' | 'desc' } | null }) {
+    if (sort?.col !== col) return <span className="ml-1 opacity-30">↕</span>
+    return <span className="ml-1">{sort.dir === 'asc' ? '↑' : '↓'}</span>
   }
 
   // ── Loaders ──
@@ -1202,6 +1248,14 @@ export function ObraDetailPage() {
               )}
             </form>
           </div>
+          <div className="mb-3">
+            <Input
+              placeholder="Buscar por fornecedor ou item…"
+              value={searchMateriais}
+              onChange={e => setSearchMateriais(e.target.value)}
+              className="h-8 text-sm bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-text)] max-w-xs"
+            />
+          </div>
           {loadingMateriais ? (
             <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-14 rounded bg-[var(--color-surface)] animate-pulse" />)}</div>
           ) : materiais.length === 0 ? (
@@ -1213,17 +1267,19 @@ export function ObraDetailPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-[var(--color-border)] bg-[var(--color-surface-2)]">
-                    <th className="text-left px-3 py-2 text-xs text-[var(--color-muted)] font-medium">Fornecedor</th>
-                    <th className="text-left px-3 py-2 text-xs text-[var(--color-muted)] font-medium">Item</th>
-                    <th className="text-left px-3 py-2 text-xs text-[var(--color-muted)] font-medium">Categoria</th>
-                    <th className="text-left px-3 py-2 text-xs text-[var(--color-muted)] font-medium">Pagamento</th>
-                    <th className="text-right px-3 py-2 text-xs text-[var(--color-muted)] font-medium">Valor</th>
-                    <th className="text-center px-3 py-2 text-xs text-[var(--color-muted)] font-medium">Data</th>
+                    <th className="text-left px-3 py-2 text-xs text-[var(--color-muted)] font-medium cursor-pointer select-none hover:text-[var(--color-text)]" onClick={() => toggleSort(sortMateriais, 'fornecedor', setSortMateriais)}>Fornecedor<SortIcon col="fornecedor" sort={sortMateriais} /></th>
+                    <th className="text-left px-3 py-2 text-xs text-[var(--color-muted)] font-medium cursor-pointer select-none hover:text-[var(--color-text)]" onClick={() => toggleSort(sortMateriais, 'item', setSortMateriais)}>Item<SortIcon col="item" sort={sortMateriais} /></th>
+                    <th className="text-left px-3 py-2 text-xs text-[var(--color-muted)] font-medium cursor-pointer select-none hover:text-[var(--color-text)]" onClick={() => toggleSort(sortMateriais, 'categoria', setSortMateriais)}>Categoria<SortIcon col="categoria" sort={sortMateriais} /></th>
+                    <th className="text-left px-3 py-2 text-xs text-[var(--color-muted)] font-medium cursor-pointer select-none hover:text-[var(--color-text)]" onClick={() => toggleSort(sortMateriais, 'forma_pagamento', setSortMateriais)}>Pagamento<SortIcon col="forma_pagamento" sort={sortMateriais} /></th>
+                    <th className="text-right px-3 py-2 text-xs text-[var(--color-muted)] font-medium cursor-pointer select-none hover:text-[var(--color-text)]" onClick={() => toggleSort(sortMateriais, 'valor_total', setSortMateriais)}>Valor<SortIcon col="valor_total" sort={sortMateriais} /></th>
+                    <th className="text-center px-3 py-2 text-xs text-[var(--color-muted)] font-medium cursor-pointer select-none hover:text-[var(--color-text)]" onClick={() => toggleSort(sortMateriais, 'data_compra', setSortMateriais)}>Data<SortIcon col="data_compra" sort={sortMateriais} /></th>
                     <th className="px-3 py-2" />
                   </tr>
                 </thead>
                 <tbody>
-                  {materiais.map(m => (
+                  {sortAndFilter(materiais as unknown as Record<string, unknown>[], searchMateriais, ['fornecedor', 'item'], sortMateriais).map(m_ => {
+                  const m = m_ as Material
+                  return (
                     <tr key={m.id} className="border-b border-[var(--color-border)] hover:bg-[var(--color-surface-2)]/50">
                       <td className="px-3 py-2 text-[var(--color-text)]">{m.fornecedor}</td>
                       <td className="px-3 py-2 text-[var(--color-text)]">{m.item}</td>
@@ -1240,7 +1296,7 @@ export function ObraDetailPage() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  )})}
                 </tbody>
               </table>
             </div>
@@ -1267,6 +1323,14 @@ export function ObraDetailPage() {
               </Button>
             </div>
           </div>
+          <div className="mb-3">
+            <Input
+              placeholder="Buscar por nome ou função…"
+              value={searchMao}
+              onChange={e => setSearchMao(e.target.value)}
+              className="h-8 text-sm bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-text)] max-w-xs"
+            />
+          </div>
           {loadingMao ? (
             <div className="space-y-2">{[1,2].map(i => <div key={i} className="h-14 rounded bg-[var(--color-surface)] animate-pulse" />)}</div>
           ) : maoDeObra.length === 0 ? (
@@ -1278,22 +1342,51 @@ export function ObraDetailPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-[var(--color-border)] bg-[var(--color-surface-2)]">
-                    <th className="text-left px-3 py-2 text-xs text-[var(--color-muted)] font-medium">Nome</th>
-                    <th className="text-left px-3 py-2 text-xs text-[var(--color-muted)] font-medium">Modalidade</th>
-                    <th className="text-right px-3 py-2 text-xs text-[var(--color-muted)] font-medium">Valor Pago</th>
-                    <th className="text-center px-3 py-2 text-xs text-[var(--color-muted)] font-medium">Data</th>
+                    <th className="text-left px-3 py-2 text-xs text-[var(--color-muted)] font-medium cursor-pointer select-none hover:text-[var(--color-text)]" onClick={() => toggleSort(sortMao, 'nome', setSortMao)}>Nome<SortIcon col="nome" sort={sortMao} /></th>
+                    <th className="text-left px-3 py-2 text-xs text-[var(--color-muted)] font-medium">CPF/CNPJ</th>
+                    <th className="text-left px-3 py-2 text-xs text-[var(--color-muted)] font-medium cursor-pointer select-none hover:text-[var(--color-text)]" onClick={() => toggleSort(sortMao, 'funcao', setSortMao)}>Função<SortIcon col="funcao" sort={sortMao} /></th>
+                    <th className="text-left px-3 py-2 text-xs text-[var(--color-muted)] font-medium cursor-pointer select-none hover:text-[var(--color-text)]" onClick={() => toggleSort(sortMao, 'modalidade', setSortMao)}>Modalidade<SortIcon col="modalidade" sort={sortMao} /></th>
+                    <th className="text-right px-3 py-2 text-xs text-[var(--color-muted)] font-medium cursor-pointer select-none hover:text-[var(--color-text)]" onClick={() => toggleSort(sortMao, 'valor_bruto', setSortMao)}>Bruto<SortIcon col="valor_bruto" sort={sortMao} /></th>
+                    <th className="text-right px-3 py-2 text-xs text-[var(--color-muted)] font-medium cursor-pointer select-none hover:text-[var(--color-text)]" onClick={() => toggleSort(sortMao, 'valor_pago', setSortMao)}>Valor Pago<SortIcon col="valor_pago" sort={sortMao} /></th>
+                    <th className="text-center px-3 py-2 text-xs text-[var(--color-muted)] font-medium cursor-pointer select-none hover:text-[var(--color-text)]" onClick={() => toggleSort(sortMao, 'status', setSortMao)}>Status<SortIcon col="status" sort={sortMao} /></th>
+                    <th className="text-center px-3 py-2 text-xs text-[var(--color-muted)] font-medium cursor-pointer select-none hover:text-[var(--color-text)]" onClick={() => toggleSort(sortMao, 'data_pagamento', setSortMao)}>Data<SortIcon col="data_pagamento" sort={sortMao} /></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {maoDeObra.map(mo => (
+                  {sortAndFilter(maoDeObra as unknown as Record<string, unknown>[], searchMao, ['nome', 'funcao'], sortMao).map(mo_ => {
+                  const mo = mo_ as MaoDeObra
+                  return (
                     <tr key={mo.id} className="border-b border-[var(--color-border)] hover:bg-[var(--color-surface-2)]/50">
-                      <td className="px-3 py-2 text-[var(--color-text)]">{mo.nome}</td>
+                      <td className="px-3 py-2 text-[var(--color-text)] font-medium">{mo.nome}</td>
+                      <td className="px-3 py-2 text-[var(--color-muted)] text-xs">{mo.cpf_cnpj ?? '—'}</td>
+                      <td className="px-3 py-2 text-[var(--color-muted)]">{mo.funcao ?? '—'}</td>
                       <td className="px-3 py-2"><ModalidadeBadge modalidade={mo.modalidade} /></td>
-                      <td className="px-3 py-2 text-right"><ValorMonetario value={mo.valor_pago} /></td>
+                      <td className="px-3 py-2 text-right text-[var(--color-muted)]">
+                        {mo.valor_bruto ? <ValorMonetario value={mo.valor_bruto} /> : '—'}
+                      </td>
+                      <td className="px-3 py-2 text-right font-medium"><ValorMonetario value={mo.valor_pago} /></td>
+                      <td className="px-3 py-2 text-center">
+                        <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${mo.status === 'realizado' ? 'bg-green-900/40 text-green-400' : 'bg-yellow-900/30 text-yellow-400'}`}>
+                          {mo.status === 'realizado' ? 'Pago' : 'Pendente'}
+                        </span>
+                      </td>
                       <td className="px-3 py-2 text-center text-[var(--color-muted)]">{fmtDate(mo.data_pagamento)}</td>
                     </tr>
-                  ))}
+                  )
+                  })}
                 </tbody>
+                <tfoot className="bg-[var(--color-surface-2)] border-t-2 border-[var(--color-border)]">
+                  <tr>
+                    <td colSpan={5} className="px-3 py-2 text-xs text-[var(--color-muted)]">
+                      Total ({maoDeObra.length} lançamentos) —{' '}
+                      <span className="text-[var(--color-danger)]">{maoDeObra.filter(mo => mo.status !== 'realizado').length} pendente(s)</span>
+                    </td>
+                    <td className="px-3 py-2 text-right font-bold text-sm">
+                      <ValorMonetario value={maoDeObra.reduce((s, mo) => s + mo.valor_pago, 0)} />
+                    </td>
+                    <td colSpan={2} />
+                  </tr>
+                </tfoot>
               </table>
             </div>
           )}

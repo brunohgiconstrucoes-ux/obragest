@@ -608,7 +608,6 @@ export function MedicaoDetailPage() {
                 periodo_inicio: fd.get('periodo_inicio') as string,
                 periodo_fim: fd.get('periodo_fim') as string,
                 data_prevista_recebimento: (fd.get('data_prevista_recebimento') as string) || null,
-                observacao: (fd.get('observacao') as string) || null,
               }).eq('id', medicao.id)
               if (error) {
                 toast({ description: 'Erro ao salvar.', variant: 'destructive' })
@@ -617,7 +616,6 @@ export function MedicaoDetailPage() {
                   periodo_inicio: fd.get('periodo_inicio') as string,
                   periodo_fim: fd.get('periodo_fim') as string,
                   data_prevista_recebimento: (fd.get('data_prevista_recebimento') as string) || null,
-                  observacao: (fd.get('observacao') as string) || null,
                 } : m)
                 toast({ description: 'Medição atualizada.' })
                 setShowEditDialog(false)
