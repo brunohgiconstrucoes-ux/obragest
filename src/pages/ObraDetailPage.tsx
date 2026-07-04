@@ -1089,6 +1089,17 @@ export function ObraDetailPage() {
                     </tr>
                   ))}
                 </tbody>
+                <tfoot className="bg-[var(--color-surface-2)] border-t-2 border-[var(--color-border)]">
+                  <tr>
+                    <td colSpan={5} className="px-3 py-2 text-xs font-semibold text-[var(--color-text)]">
+                      Total contratado ({planilha.length} {planilha.length === 1 ? 'item' : 'itens'})
+                    </td>
+                    <td className="px-3 py-2 text-right font-bold text-[var(--color-text)]">
+                      <ValorMonetario value={planilha.reduce((s, i) => s + i.valor_contratado, 0)} />
+                    </td>
+                    <td colSpan={3} />
+                  </tr>
+                </tfoot>
               </table>
             </div>
           )}
@@ -1205,6 +1216,7 @@ export function ObraDetailPage() {
                     <th className="text-left px-3 py-2 text-xs text-[var(--color-muted)] font-medium">Fornecedor</th>
                     <th className="text-left px-3 py-2 text-xs text-[var(--color-muted)] font-medium">Item</th>
                     <th className="text-left px-3 py-2 text-xs text-[var(--color-muted)] font-medium">Categoria</th>
+                    <th className="text-left px-3 py-2 text-xs text-[var(--color-muted)] font-medium">Pagamento</th>
                     <th className="text-right px-3 py-2 text-xs text-[var(--color-muted)] font-medium">Valor</th>
                     <th className="text-center px-3 py-2 text-xs text-[var(--color-muted)] font-medium">Data</th>
                     <th className="px-3 py-2" />
@@ -1216,6 +1228,7 @@ export function ObraDetailPage() {
                       <td className="px-3 py-2 text-[var(--color-text)]">{m.fornecedor}</td>
                       <td className="px-3 py-2 text-[var(--color-text)]">{m.item}</td>
                       <td className="px-3 py-2 text-[var(--color-muted)]">{categoriaLabel[m.categoria]}</td>
+                      <td className="px-3 py-2 text-[var(--color-muted)] text-xs">{formaPagLabel[m.forma_pagamento]}</td>
                       <td className="px-3 py-2 text-right"><ValorMonetario value={m.valor_total} /></td>
                       <td className="px-3 py-2 text-center text-[var(--color-muted)]">{fmtDate(m.data_compra)}</td>
                       <td className="px-3 py-2">

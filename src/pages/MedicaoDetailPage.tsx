@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
-import { ArrowLeft, FileText, CheckCircle, Clock, AlertCircle } from 'lucide-react'
+import { ArrowLeft, FileText, CheckCircle, Clock, AlertCircle, Pencil } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -10,6 +10,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useToast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ValorMonetario } from '@/components/shared/ValorMonetario'
@@ -93,6 +94,8 @@ export function MedicaoDetailPage() {
   const [itens, setItens] = useState<MedicaoItem[]>([])
   const [loading, setLoading] = useState(true)
   const [showDialog, setShowDialog] = useState(false)
+  const [showEditDialog, setShowEditDialog] = useState(false)
+  const [editSaving, setEditSaving] = useState(false)
   const [saving, setSaving] = useState(false)
   const [gerandoPdf, setGerandoPdf] = useState(false)
 
@@ -264,6 +267,18 @@ export function MedicaoDetailPage() {
         </div>
         <div className="flex items-center gap-3">
           <StatusBadge status={medicao.status} />
+          {medicao.status !== 'recebido' && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowEditDialog(true)}
+              className="flex items-center gap-2"
+              style={{ borderColor: 'var(--color-border)', color: 'var(--color-text)' }}
+            >
+              <Pencil className="w-4 h-4" />
+              Editar medição
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -576,6 +591,65 @@ export function MedicaoDetailPage() {
           </div>
         </div>
       )}
+
+      {/* Dialog editar medição */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-text)] max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-[var(--color-text)]">Editar Medição #{medicao.numero}</DialogTitle>
+          </DialogHeader>
+          <form
+            className="space-y-4 mt-2"
+            onSubmit={async e => {
+              e.preventDefault()
+              const fd = new FormData(e.currentTarget)
+              setEditSaving(true)
+              const { error } = await supabase.from('medicoes').update({
+                periodo_inicio: fd.get('periodo_inicio') as string,
+                periodo_fim: fd.get('periodo_fim') as string,
+                data_prevista_recebimento: (fd.get('data_prevista_recebimento') as string) || null,
+                observacao: (fd.get('observacao') as string) || null,
+              }).eq('id', medicao.id)
+              if (error) {
+                toast({ description: 'Erro ao salvar.', variant: 'destructive' })
+              } else {
+                setMedicao(m => m ? { ...m,
+                  periodo_inicio: fd.get('periodo_inicio') as string,
+                  periodo_fim: fd.get('periodo_fim') as string,
+                  data_prevista_recebimento: (fd.get('data_prevista_recebimento') as string) || null,
+                  observacao: (fd.get('observacao') as string) || null,
+                } : m)
+                toast({ description: 'Medição atualizada.' })
+                setShowEditDialog(false)
+              }
+              setEditSaving(false)
+            }}
+          >
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs text-[var(--color-muted)]">Período início *</Label>
+                <Input name="periodo_inicio" type="date" defaultValue={medicao.periodo_inicio} className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]" required />
+              </div>
+              <div>
+                <Label className="text-xs text-[var(--color-muted)]">Período fim *</Label>
+                <Input name="periodo_fim" type="date" defaultValue={medicao.periodo_fim} className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]" required />
+              </div>
+              <div className="col-span-2">
+                <Label className="text-xs text-[var(--color-muted)]">Data prevista de recebimento</Label>
+                <Input name="data_prevista_recebimento" type="date" defaultValue={medicao.data_prevista_recebimento ?? ''} className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]" />
+              </div>
+              <div className="col-span-2">
+                <Label className="text-xs text-[var(--color-muted)]">Observação</Label>
+                <textarea name="observacao" defaultValue={(medicao as any).observacao ?? ''} rows={2} className="mt-1 w-full rounded-md bg-[var(--color-surface-2)] border border-[var(--color-border)] text-[var(--color-text)] text-sm px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]" />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setShowEditDialog(false)} className="border-[var(--color-border)] text-[var(--color-text)]">Cancelar</Button>
+              <Button type="submit" disabled={editSaving} className="bg-[var(--color-primary)] hover:bg-[var(--color-primary-dim)] text-black">{editSaving ? 'Salvando…' : 'Salvar'}</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
