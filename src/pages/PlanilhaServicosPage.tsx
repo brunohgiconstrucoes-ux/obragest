@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { Plus, AlertTriangle, ClipboardPaste, ChevronRight } from 'lucide-react'
+import { Plus, AlertTriangle, ClipboardPaste, ChevronRight, Upload, FileSpreadsheet } from 'lucide-react'
+import * as XLSX from 'xlsx'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { useToast } from '@/hooks/use-toast'
@@ -27,6 +28,13 @@ export function PlanilhaServicosPage() {
   const [previewLinhas, setPreviewLinhas] = useState<string[][]>([])
   const [dialogOpen, setDialogOpen] = useState(false)
   const [saving, setSaving] = useState(false)
+  // import extras
+  const [importMode, setImportMode] = useState<'paste' | 'file'>('paste')
+  const [xlsxSheets, setXlsxSheets] = useState<string[]>([])
+  const [xlsxWorkbook, setXlsxWorkbook] = useState<XLSX.WorkBook | null>(null)
+  const [selectedSheet, setSelectedSheet] = useState('')
+  const [skipHeader, setSkipHeader] = useState(true)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!user || !obraId) return
@@ -133,28 +141,92 @@ export function PlanilhaServicosPage() {
     loadData()
   }
 
-  function parsePasta(texto: string) {
-    const linhas = texto
-      .trim()
-      .split('\n')
-      .map(l => l.split('\t').map(c => c.trim()))
-      .filter(l => l.length >= 2)
-    setPreviewLinhas(linhas)
+  // Detecta se a primeira linha é cabeçalho (contém texto não numérico em cols numéricas)
+  function isHeaderRow(row: string[]): boolean {
+    const qtdCol = row[3] ?? ''
+    const valCol = row[4] ?? ''
+    const qtdNum = Number(qtdCol.replace(',', '.').replace(/[^\d.-]/g, ''))
+    const valNum = Number(valCol.replace(',', '.').replace(/[^\d.-]/g, ''))
+    return isNaN(qtdNum) || isNaN(valNum) || (qtdCol !== '' && qtdNum === 0 && isNaN(Number(qtdCol)))
   }
 
+  function parseLinhasRaw(rows: string[][]): string[][] {
+    const filtered = rows.filter(l => l.length >= 2 && l.some(c => c !== ''))
+    if (skipHeader && filtered.length > 0 && isHeaderRow(filtered[0])) {
+      return filtered.slice(1)
+    }
+    return filtered
+  }
+
+  function parsePasta(texto: string) {
+    const separator = texto.includes('\t') ? '\t' : ';'
+    const rows = texto
+      .trim()
+      .split('\n')
+      .map(l => l.split(separator).map(c => c.trim()))
+    setPreviewLinhas(parseLinhasRaw(rows))
+  }
+
+  function parseXlsxSheet(wb: XLSX.WorkBook, sheetName: string) {
+    const ws = wb.Sheets[sheetName]
+    const rows: string[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' }) as string[][]
+    const stringRows = rows.map(r => r.map(c => String(c ?? '').trim()))
+    setPreviewLinhas(parseLinhasRaw(stringRows))
+  }
+
+  function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = evt => {
+      const data = new Uint8Array(evt.target!.result as ArrayBuffer)
+      const wb = XLSX.read(data, { type: 'array' })
+      setXlsxWorkbook(wb)
+      setXlsxSheets(wb.SheetNames)
+      const first = wb.SheetNames[0]
+      setSelectedSheet(first)
+      parseXlsxSheet(wb, first)
+    }
+    reader.readAsArrayBuffer(file)
+  }
+
+  function handleSheetChange(sheet: string) {
+    setSelectedSheet(sheet)
+    if (xlsxWorkbook) parseXlsxSheet(xlsxWorkbook, sheet)
+  }
+
+  function rowHasError(cols: string[]): boolean {
+    const qtd = Number(cols[3]?.replace(',', '.').replace(/[^\d.-]/g, '') || '0')
+    const val = Number(cols[4]?.replace(',', '.').replace(/[^\d.-]/g, '') || '0')
+    return !cols[1]?.trim() || isNaN(qtd) || isNaN(val) || qtd < 0 || val < 0
+  }
+
+  function closeImportDialog() {
+    setDialogOpen(false)
+    setPastaTexto('')
+    setPreviewLinhas([])
+    setXlsxSheets([])
+    setXlsxWorkbook(null)
+    setSelectedSheet('')
+    setImportMode('paste')
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const linhasValidas = previewLinhas.filter(r => !rowHasError(r))
+
   async function importarLinhas() {
-    if (previewLinhas.length === 0) return
+    if (linhasValidas.length === 0) return
     setSaving(true)
     const nextOrdem = itens.length > 0 ? Math.max(...itens.map(i => i.ordem)) + 1 : 1
-    const inserts = previewLinhas.map((cols, idx) => ({
+    const inserts = linhasValidas.map((cols, idx) => ({
       obra_id: obraId!,
       user_id: user!.id,
       codigo: cols[0] || null,
       descricao: cols[1] || 'Item importado',
       unidade: cols[2] || 'un',
-      quantidade_contratada: Number(cols[3]?.replace(',', '.') || 0),
+      quantidade_contratada: Number(cols[3]?.replace(',', '.').replace(/[^\d.-]/g, '') || 0),
       // Excel values are in reais — convert to centavos (bigint) for DB
-      valor_unitario: Math.round(Number(cols[4]?.replace(',', '.') || 0) * 100),
+      valor_unitario: Math.round(Number(cols[4]?.replace(',', '.').replace(/[^\d.-]/g, '') || 0) * 100),
       ordem: nextOrdem + idx,
     }))
     const { error } = await supabase.from('planilha_itens').insert(inserts)
@@ -163,9 +235,7 @@ export function PlanilhaServicosPage() {
       toast({ title: 'Erro ao importar linhas', description: error.message, variant: 'destructive' })
       return
     }
-    setDialogOpen(false)
-    setPastaTexto('')
-    setPreviewLinhas([])
+    closeImportDialog()
     loadData()
   }
 
@@ -192,15 +262,15 @@ export function PlanilhaServicosPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-[var(--color-text)]">Planilha de Serviços</h1>
         <div className="flex gap-2">
-          {/* Modal Colar do Excel */}
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          {/* Modal Importar do Excel */}
+          <Dialog open={dialogOpen} onOpenChange={open => { if (!open) closeImportDialog(); else setDialogOpen(true) }}>
             <DialogTrigger asChild>
               <Button
                 variant="outline"
                 className="border-[var(--color-border)] text-[var(--color-text)] hover:bg-[var(--color-surface-2)] gap-2"
               >
                 <ClipboardPaste className="w-4 h-4" />
-                Colar do Excel
+                Importar Excel
               </Button>
             </DialogTrigger>
             <DialogContent className="bg-[var(--color-surface)] border-[var(--color-border)] max-w-2xl">
@@ -208,71 +278,141 @@ export function PlanilhaServicosPage() {
                 <DialogTitle className="text-[var(--color-text)]">Importar do Excel</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
-                <p className="text-sm text-[var(--color-muted)]">
-                  Copie as colunas do Excel na ordem:{' '}
-                  <strong className="text-[var(--color-text)]">
-                    Código, Descrição, Unidade, Quantidade, Valor Unitário
-                  </strong>
-                  . Cole aqui:
+
+                {/* Abas modo */}
+                <div className="flex gap-1 p-1 bg-[var(--color-surface-2)] rounded-md w-fit">
+                  <button
+                    onClick={() => setImportMode('paste')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors ${importMode === 'paste' ? 'bg-[var(--color-surface)] text-[var(--color-text)] shadow-sm' : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'}`}
+                  >
+                    <ClipboardPaste className="w-3.5 h-3.5" /> Colar dados
+                  </button>
+                  <button
+                    onClick={() => setImportMode('file')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors ${importMode === 'file' ? 'bg-[var(--color-surface)] text-[var(--color-text)] shadow-sm' : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'}`}
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5" /> Arquivo .xlsx
+                  </button>
+                </div>
+
+                <p className="text-xs text-[var(--color-muted)]">
+                  Ordem esperada das colunas:{' '}
+                  <strong className="text-[var(--color-text)]">Código · Descrição · Unidade · Quantidade · Valor Unitário</strong>
                 </p>
-                <textarea
-                  value={pastaTexto}
-                  onChange={e => {
-                    setPastaTexto(e.target.value)
-                    parsePasta(e.target.value)
-                  }}
-                  rows={8}
-                  className="w-full rounded-md border bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)] px-3 py-2 text-sm font-mono resize-none focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
-                  placeholder="Cole aqui os dados copiados do Excel..."
-                />
+
+                {/* Modo: colar */}
+                {importMode === 'paste' && (
+                  <textarea
+                    value={pastaTexto}
+                    onChange={e => { setPastaTexto(e.target.value); parsePasta(e.target.value) }}
+                    rows={7}
+                    className="w-full rounded-md border bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)] px-3 py-2 text-sm font-mono resize-none focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                    placeholder="Cole aqui os dados copiados do Excel (Tab ou ; como separador)..."
+                  />
+                )}
+
+                {/* Modo: arquivo */}
+                {importMode === 'file' && (
+                  <div className="space-y-3">
+                    <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-[var(--color-border)] rounded-lg p-6 cursor-pointer hover:border-[var(--color-primary)] transition-colors">
+                      <Upload className="w-6 h-6 text-[var(--color-muted)]" />
+                      <span className="text-sm text-[var(--color-muted)]">Clique para selecionar arquivo .xlsx ou .xls</span>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".xlsx,.xls,.csv"
+                        className="hidden"
+                        onChange={handleFileUpload}
+                      />
+                    </label>
+                    {xlsxSheets.length > 1 && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-[var(--color-muted)] shrink-0">Aba:</span>
+                        <div className="flex flex-wrap gap-1">
+                          {xlsxSheets.map(s => (
+                            <button
+                              key={s}
+                              onClick={() => handleSheetChange(s)}
+                              className={`px-2 py-0.5 rounded text-xs border transition-colors ${selectedSheet === s ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-primary)]' : 'border-[var(--color-border)] text-[var(--color-muted)] hover:text-[var(--color-text)]'}`}
+                            >
+                              {s}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Opção pular cabeçalho */}
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={skipHeader}
+                    onChange={e => {
+                      setSkipHeader(e.target.checked)
+                      if (importMode === 'paste') parsePasta(pastaTexto)
+                      else if (xlsxWorkbook && selectedSheet) parseXlsxSheet(xlsxWorkbook, selectedSheet)
+                    }}
+                    className="rounded"
+                  />
+                  <span className="text-xs text-[var(--color-muted)]">Pular linha de cabeçalho automaticamente</span>
+                </label>
+
+                {/* Preview */}
                 {previewLinhas.length > 0 && (
                   <div>
                     <p className="text-xs text-[var(--color-muted)] mb-2">
-                      {previewLinhas.length} linha(s) detectada(s):
+                      {previewLinhas.length} linha(s) detectada(s)
+                      {previewLinhas.length !== linhasValidas.length && (
+                        <span className="text-[var(--color-danger)] ml-1">
+                          · {previewLinhas.length - linhasValidas.length} com erro (destacadas)
+                        </span>
+                      )}
+                      :
                     </p>
-                    <div className="max-h-40 overflow-auto rounded border border-[var(--color-border)]">
+                    <div className="max-h-44 overflow-auto rounded border border-[var(--color-border)]">
                       <table className="w-full text-xs">
-                        <thead className="bg-[var(--color-surface-2)]">
+                        <thead className="bg-[var(--color-surface-2)] sticky top-0">
                           <tr>
                             {['Código', 'Descrição', 'Unid.', 'Qtd', 'Valor Unit.'].map(h => (
-                              <th
-                                key={h}
-                                className="px-2 py-1 text-left text-[var(--color-muted)] font-medium"
-                              >
-                                {h}
-                              </th>
+                              <th key={h} className="px-2 py-1 text-left text-[var(--color-muted)] font-medium">{h}</th>
                             ))}
                           </tr>
                         </thead>
                         <tbody>
-                          {previewLinhas.slice(0, 10).map((row, i) => (
-                            <tr key={i} className="border-t border-[var(--color-border)]">
-                              {row.map((col, j) => (
-                                <td key={j} className="px-2 py-1 text-[var(--color-text)]">
-                                  {col}
-                                </td>
-                              ))}
-                            </tr>
-                          ))}
+                          {previewLinhas.map((row, i) => {
+                            const hasErr = rowHasError(row)
+                            return (
+                              <tr key={i} className={`border-t border-[var(--color-border)] ${hasErr ? 'bg-[var(--color-danger)]/10' : ''}`}>
+                                {[0,1,2,3,4].map(j => (
+                                  <td key={j} className={`px-2 py-1 ${hasErr && (j === 1 && !row[1]?.trim() || j >= 3) ? 'text-[var(--color-danger)]' : 'text-[var(--color-text)]'}`}>
+                                    {row[j] ?? ''}
+                                  </td>
+                                ))}
+                              </tr>
+                            )
+                          })}
                         </tbody>
                       </table>
                     </div>
                   </div>
                 )}
+
                 <div className="flex gap-2 justify-end">
                   <Button
                     variant="outline"
-                    onClick={() => setDialogOpen(false)}
+                    onClick={closeImportDialog}
                     className="border-[var(--color-border)] text-[var(--color-text)]"
                   >
                     Cancelar
                   </Button>
                   <Button
                     onClick={importarLinhas}
-                    disabled={previewLinhas.length === 0 || saving}
+                    disabled={linhasValidas.length === 0 || saving}
                     className="bg-[var(--color-primary)] hover:bg-[var(--color-primary-dim)] text-white"
                   >
-                    {saving ? 'Importando...' : `Importar ${previewLinhas.length} linha(s)`}
+                    {saving ? 'Importando...' : `Importar ${linhasValidas.length} linha(s)`}
                   </Button>
                 </div>
               </div>
