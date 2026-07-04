@@ -81,6 +81,130 @@ function StatusBadge({ status }: { status: Medicao['status'] }) {
   )
 }
 
+// ── EditMedicaoForm ───────────────────────────────────────────────────────────
+
+function EditMedicaoForm({
+  medicao,
+  obra,
+  onSaved,
+  onCancel,
+}: {
+  medicao: Medicao
+  obra: Obra
+  onSaved: (updated: Medicao) => void
+  onCancel: () => void
+}) {
+  const { toast } = useToast()
+  const [saving, setSaving] = useState(false)
+  const [valorBruto, setValorBruto] = useState((medicao.valor_bruto / 100).toFixed(2))
+
+  const caucaoPct = obra.aliquota_caucao ?? 0
+  const issPct = obra.aliquota_iss ?? 0
+  const inssPct = obra.aliquota_inss ?? 0
+  const irrfPct = obra.aliquota_irrf ?? 0
+
+  const bruto = Math.round(parseFloat(valorBruto.replace(',', '.') || '0') * 100)
+  const retCaucao = Math.round(bruto * caucaoPct / 100)
+  const retIss = Math.round(bruto * issPct / 100)
+  const retInss = Math.round(bruto * inssPct / 100)
+  const retIrrf = Math.round(bruto * irrfPct / 100)
+  const totalRet = retCaucao + retIss + retInss + retIrrf
+  const liquido = bruto - totalRet
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const fd = new FormData(e.currentTarget)
+    setSaving(true)
+
+    const updated = {
+      periodo_inicio: fd.get('periodo_inicio') as string,
+      periodo_fim: fd.get('periodo_fim') as string,
+      data_prevista_recebimento: (fd.get('data_prevista_recebimento') as string) || null,
+      valor_bruto: bruto,
+      retencao_caucao: retCaucao,
+      retencao_iss: retIss,
+      retencao_inss: retInss,
+      retencao_irrf: retIrrf,
+      valor_liquido: liquido,
+    }
+
+    const { error } = await supabase.from('medicoes').update(updated).eq('id', medicao.id)
+    if (error) {
+      toast({ description: 'Erro ao salvar medição.', variant: 'destructive' })
+      setSaving(false)
+      return
+    }
+
+    // Atualiza lançamento no fluxo de caixa vinculado
+    await supabase
+      .from('fluxo_caixa')
+      .update({ valor: liquido })
+      .eq('origem_id', medicao.id)
+      .eq('origem', 'medicao')
+
+    toast({ description: 'Medição atualizada.' })
+    onSaved({ ...medicao, ...updated })
+    setSaving(false)
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+      {/* Período */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <Label className="text-xs text-[var(--color-muted)]">Período início *</Label>
+          <Input name="periodo_inicio" type="date" defaultValue={medicao.periodo_inicio} className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]" required />
+        </div>
+        <div>
+          <Label className="text-xs text-[var(--color-muted)]">Período fim *</Label>
+          <Input name="periodo_fim" type="date" defaultValue={medicao.periodo_fim} className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]" required />
+        </div>
+        <div className="col-span-2">
+          <Label className="text-xs text-[var(--color-muted)]">Data prevista de recebimento</Label>
+          <Input name="data_prevista_recebimento" type="date" defaultValue={medicao.data_prevista_recebimento ?? ''} className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]" />
+        </div>
+      </div>
+
+      {/* Valores financeiros */}
+      <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] p-4">
+        <p className="text-xs font-semibold text-[var(--color-muted)] uppercase tracking-wide mb-3">Valores financeiros</p>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2">
+            <Label className="text-xs text-[var(--color-muted)]">Valor Bruto (R$) *</Label>
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              value={valorBruto}
+              onChange={e => setValorBruto(e.target.value)}
+              className="mt-1 bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-text)]"
+              required
+            />
+          </div>
+        </div>
+        {/* Preview de retenções */}
+        {bruto > 0 && (
+          <div className="mt-3 space-y-1.5 text-sm border-t border-[var(--color-border)] pt-3">
+            {caucaoPct > 0 && <div className="flex justify-between"><span className="text-[var(--color-muted)]">(−) Caução {caucaoPct}%</span><ValorMonetario value={retCaucao} className="text-[var(--color-danger)]" /></div>}
+            {issPct > 0 && <div className="flex justify-between"><span className="text-[var(--color-muted)]">(−) ISS {issPct}%</span><ValorMonetario value={retIss} className="text-[var(--color-danger)]" /></div>}
+            {inssPct > 0 && <div className="flex justify-between"><span className="text-[var(--color-muted)]">(−) INSS {inssPct}%</span><ValorMonetario value={retInss} className="text-[var(--color-danger)]" /></div>}
+            {irrfPct > 0 && <div className="flex justify-between"><span className="text-[var(--color-muted)]">(−) IRRF {irrfPct}%</span><ValorMonetario value={retIrrf} className="text-[var(--color-danger)]" /></div>}
+            <div className="flex justify-between font-bold border-t border-[var(--color-border)] pt-2">
+              <span className="text-[var(--color-text)]">Valor Líquido</span>
+              <ValorMonetario value={liquido} className="text-[var(--color-success)] text-base" />
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="outline" onClick={onCancel} className="border-[var(--color-border)] text-[var(--color-text)]">Cancelar</Button>
+        <Button type="submit" disabled={saving} className="bg-[var(--color-primary)] hover:bg-[var(--color-primary-dim)] text-black">{saving ? 'Salvando…' : 'Salvar'}</Button>
+      </div>
+    </form>
+  )
+}
+
 // ── MedicaoDetailPage ─────────────────────────────────────────────────────────
 
 export function MedicaoDetailPage() {
@@ -95,7 +219,6 @@ export function MedicaoDetailPage() {
   const [loading, setLoading] = useState(true)
   const [showDialog, setShowDialog] = useState(false)
   const [showEditDialog, setShowEditDialog] = useState(false)
-  const [editSaving, setEditSaving] = useState(false)
   const [saving, setSaving] = useState(false)
   const [gerandoPdf, setGerandoPdf] = useState(false)
 
@@ -594,58 +717,11 @@ export function MedicaoDetailPage() {
 
       {/* Dialog editar medição */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-text)] max-w-sm">
+        <DialogContent className="bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-text)] max-w-2xl">
           <DialogHeader>
             <DialogTitle className="text-[var(--color-text)]">Editar Medição #{medicao.numero}</DialogTitle>
           </DialogHeader>
-          <form
-            className="space-y-4 mt-2"
-            onSubmit={async e => {
-              e.preventDefault()
-              const fd = new FormData(e.currentTarget)
-              setEditSaving(true)
-              const { error } = await supabase.from('medicoes').update({
-                periodo_inicio: fd.get('periodo_inicio') as string,
-                periodo_fim: fd.get('periodo_fim') as string,
-                data_prevista_recebimento: (fd.get('data_prevista_recebimento') as string) || null,
-              }).eq('id', medicao.id)
-              if (error) {
-                toast({ description: 'Erro ao salvar.', variant: 'destructive' })
-              } else {
-                setMedicao(m => m ? { ...m,
-                  periodo_inicio: fd.get('periodo_inicio') as string,
-                  periodo_fim: fd.get('periodo_fim') as string,
-                  data_prevista_recebimento: (fd.get('data_prevista_recebimento') as string) || null,
-                } : m)
-                toast({ description: 'Medição atualizada.' })
-                setShowEditDialog(false)
-              }
-              setEditSaving(false)
-            }}
-          >
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs text-[var(--color-muted)]">Período início *</Label>
-                <Input name="periodo_inicio" type="date" defaultValue={medicao.periodo_inicio} className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]" required />
-              </div>
-              <div>
-                <Label className="text-xs text-[var(--color-muted)]">Período fim *</Label>
-                <Input name="periodo_fim" type="date" defaultValue={medicao.periodo_fim} className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]" required />
-              </div>
-              <div className="col-span-2">
-                <Label className="text-xs text-[var(--color-muted)]">Data prevista de recebimento</Label>
-                <Input name="data_prevista_recebimento" type="date" defaultValue={medicao.data_prevista_recebimento ?? ''} className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]" />
-              </div>
-              <div className="col-span-2">
-                <Label className="text-xs text-[var(--color-muted)]">Observação</Label>
-                <textarea name="observacao" defaultValue={(medicao as any).observacao ?? ''} rows={2} className="mt-1 w-full rounded-md bg-[var(--color-surface-2)] border border-[var(--color-border)] text-[var(--color-text)] text-sm px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]" />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setShowEditDialog(false)} className="border-[var(--color-border)] text-[var(--color-text)]">Cancelar</Button>
-              <Button type="submit" disabled={editSaving} className="bg-[var(--color-primary)] hover:bg-[var(--color-primary-dim)] text-black">{editSaving ? 'Salvando…' : 'Salvar'}</Button>
-            </div>
-          </form>
+          <EditMedicaoForm medicao={medicao} obra={obra} onSaved={(updated) => { setMedicao(updated); setShowEditDialog(false) }} onCancel={() => setShowEditDialog(false)} />
         </DialogContent>
       </Dialog>
     </div>

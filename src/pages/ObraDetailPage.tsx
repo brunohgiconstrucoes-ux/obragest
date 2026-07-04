@@ -49,6 +49,8 @@ const materialSchema = z.object({
   valor_total_reais: z.coerce.number().positive('Valor obrigatório'),
   data_compra: z.string().min(1, 'Obrigatório'),
   forma_pagamento: z.enum(['avista', 'boleto', 'cartao', 'cheque', 'prazo']),
+  numero_parcelas: z.coerce.number().int().min(1).max(99).optional().or(z.literal('')),
+  parcelas_pagas: z.coerce.number().int().min(0).max(99).optional().or(z.literal('')),
   observacao: z.string().optional(),
 })
 
@@ -185,6 +187,23 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 // ── Material Dialog ──────────────────────────────────────────────────────────
 
+function parseParcelas(obs: string | null): { numero: number; pagas: number; obs: string } {
+  if (!obs) return { numero: 1, pagas: 0, obs: '' }
+  const m = obs.match(/^PARCELAS:(\d+)\/(\d+)\n?/)
+  if (!m) return { numero: 1, pagas: 0, obs }
+  return { numero: parseInt(m[1]), pagas: parseInt(m[2]), obs: obs.replace(/^PARCELAS:\d+\/\d+\n?/, '') }
+}
+
+function buildObservacao(values: MaterialFormValues): string | null {
+  const np = values.numero_parcelas === '' || values.numero_parcelas == null ? 1 : Number(values.numero_parcelas)
+  const pp = values.parcelas_pagas === '' || values.parcelas_pagas == null ? 0 : Number(values.parcelas_pagas)
+  const obs = values.observacao?.trim() ?? ''
+  if (np > 1) {
+    return `PARCELAS:${np}/${pp}${obs ? '\n' + obs : ''}`
+  }
+  return obs || null
+}
+
 function MaterialDialog({ obraId, material, onSaved }: { obraId: string; material?: Material; onSaved: () => void }) {
   const { user } = useAuth()
   const { toast } = useToast()
@@ -192,7 +211,9 @@ function MaterialDialog({ obraId, material, onSaved }: { obraId: string; materia
   const [saving, setSaving] = useState(false)
   const isEdit = !!material
 
-  const { register, handleSubmit, reset, control, formState: { errors } } = useForm<MaterialFormValues>({
+  const parsed = isEdit ? parseParcelas(material.observacao) : { numero: 1, pagas: 0, obs: '' }
+
+  const { register, handleSubmit, reset, control, watch, formState: { errors } } = useForm<MaterialFormValues>({
     resolver: zodResolver(materialSchema),
     defaultValues: isEdit ? {
       fornecedor: material.fornecedor,
@@ -203,13 +224,21 @@ function MaterialDialog({ obraId, material, onSaved }: { obraId: string; materia
       valor_total_reais: material.valor_total / 100,
       data_compra: material.data_compra,
       forma_pagamento: material.forma_pagamento,
-      observacao: material.observacao ?? '',
+      numero_parcelas: parsed.numero,
+      parcelas_pagas: parsed.pagas,
+      observacao: parsed.obs,
     } : {
       data_compra: todayStr(),
       categoria: 'outros',
       forma_pagamento: 'avista',
+      numero_parcelas: 1,
+      parcelas_pagas: 0,
     },
   })
+
+  const formaPag = watch('forma_pagamento')
+  const numParcelas = Number(watch('numero_parcelas') ?? 1)
+  const showParcelas = formaPag !== 'avista' && formaPag !== 'cheque'
 
   async function onSubmit(values: MaterialFormValues) {
     setSaving(true)
@@ -226,7 +255,7 @@ function MaterialDialog({ obraId, material, onSaved }: { obraId: string; materia
         valor_total: valorCentavos,
         data_compra: values.data_compra,
         forma_pagamento: values.forma_pagamento as FormaPagamento,
-        observacao: values.observacao || null,
+        observacao: buildObservacao(values),
       }).eq('id', material.id)
       if (error) {
         toast({ description: 'Erro ao atualizar material.', variant: 'destructive' })
@@ -258,7 +287,7 @@ function MaterialDialog({ obraId, material, onSaved }: { obraId: string; materia
         data_compra: values.data_compra,
         forma_pagamento: values.forma_pagamento as FormaPagamento,
         incluir_contador: true,
-        observacao: values.observacao || null,
+        observacao: buildObservacao(values),
       })
       .select('id')
       .single()
@@ -386,6 +415,27 @@ function MaterialDialog({ obraId, material, onSaved }: { obraId: string; materia
               <Input {...register('data_compra')} type="date" className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]" />
               {errors.data_compra && <p className="text-xs text-[var(--color-danger)] mt-0.5">{errors.data_compra.message}</p>}
             </div>
+            {/* Parcelamento */}
+            {showParcelas && (
+              <div className="col-span-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3 space-y-2">
+                <p className="text-xs font-semibold text-[var(--color-muted)] uppercase tracking-wide">Parcelamento</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-[var(--color-muted)] text-xs">Total de parcelas</Label>
+                    <Input {...register('numero_parcelas')} type="number" min={1} max={99} placeholder="Ex: 3" className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]" />
+                  </div>
+                  <div>
+                    <Label className="text-[var(--color-muted)] text-xs">Parcelas pagas</Label>
+                    <Input {...register('parcelas_pagas')} type="number" min={0} max={99} placeholder="0" className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]" />
+                  </div>
+                </div>
+                {numParcelas > 1 && (
+                  <p className="text-xs text-[var(--color-muted)]">
+                    Valor por parcela: <span className="text-[var(--color-text)]">aprox. R$ {(Number(watch('valor_total_reais') ?? 0) / numParcelas).toFixed(2).replace('.', ',')}</span>
+                  </p>
+                )}
+              </div>
+            )}
             <div className="col-span-2">
               <Label className="text-[var(--color-muted)] text-xs">Observação</Label>
               <textarea
@@ -1208,6 +1258,52 @@ export function ObraDetailPage() {
             <h2 className="text-sm font-semibold text-[var(--color-text)]">Compras de Materiais</h2>
             <MaterialDialog obraId={obra.id} onSaved={loadMateriais} />
           </div>
+
+          {/* Cards de resumo */}
+          {materiais.length > 0 && (() => {
+            const totalGasto = materiais.reduce((s, m) => s + m.valor_total, 0)
+            const parcelados = materiais.filter(m => parseParcelas(m.observacao).numero > 1)
+            const totalParcelado = parcelados.reduce((s, m) => s + m.valor_total, 0)
+            const porCategoria = Object.entries(
+              materiais.reduce<Record<string, number>>((acc, m) => {
+                acc[m.categoria] = (acc[m.categoria] ?? 0) + m.valor_total
+                return acc
+              }, {})
+            ).sort((a, b) => b[1] - a[1]).slice(0, 3)
+            return (
+              <div className="grid grid-cols-3 gap-3 mb-4">
+                <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
+                  <p className="text-xs text-[var(--color-muted)] mb-1">Total em materiais</p>
+                  <ValorMonetario value={totalGasto} className="text-lg font-bold text-[var(--color-text)]" />
+                  <p className="text-xs text-[var(--color-muted)] mt-0.5">{materiais.length} lançamentos</p>
+                </div>
+                <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
+                  <p className="text-xs text-[var(--color-muted)] mb-1">Parcelados</p>
+                  {parcelados.length > 0 ? (
+                    <>
+                      <ValorMonetario value={totalParcelado} className="text-lg font-bold text-[var(--color-warning)]" />
+                      <p className="text-xs text-[var(--color-muted)] mt-0.5">{parcelados.length} compra(s) parcelada(s)</p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-[var(--color-muted)] mt-1">Nenhum</p>
+                  )}
+                </div>
+                <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
+                  <p className="text-xs text-[var(--color-muted)] mb-2">Top categorias</p>
+                  <div className="space-y-1">
+                    {porCategoria.map(([cat, val]) => (
+                      <div key={cat} className="flex items-center gap-2">
+                        <div className="flex-1 bg-[var(--color-surface-2)] rounded-full h-1.5">
+                          <div className="h-1.5 rounded-full bg-[var(--color-primary)]" style={{ width: `${Math.round(val / totalGasto * 100)}%` }} />
+                        </div>
+                        <span className="text-xs text-[var(--color-muted)] w-16 text-right truncate">{categoriaLabel[cat as MaterialCategoria]}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
           {/* Quick-add */}
           <div className="mb-4 p-3 rounded-lg bg-[var(--color-surface-2)] border border-[var(--color-border)]">
             <form onSubmit={quickForm.handleSubmit(handleQuickMaterial)}>
@@ -1279,12 +1375,20 @@ export function ObraDetailPage() {
                 <tbody>
                   {sortAndFilter(materiais as unknown as Record<string, unknown>[], searchMateriais, ['fornecedor', 'item'], sortMateriais).map(m_ => {
                   const m = m_ as Material
+                  const parc = parseParcelas(m.observacao)
                   return (
                     <tr key={m.id} className="border-b border-[var(--color-border)] hover:bg-[var(--color-surface-2)]/50">
                       <td className="px-3 py-2 text-[var(--color-text)]">{m.fornecedor}</td>
                       <td className="px-3 py-2 text-[var(--color-text)]">{m.item}</td>
                       <td className="px-3 py-2 text-[var(--color-muted)]">{categoriaLabel[m.categoria]}</td>
-                      <td className="px-3 py-2 text-[var(--color-muted)] text-xs">{formaPagLabel[m.forma_pagamento]}</td>
+                      <td className="px-3 py-2 text-xs">
+                        <span className="text-[var(--color-muted)]">{formaPagLabel[m.forma_pagamento]}</span>
+                        {parc.numero > 1 && (
+                          <span className={`ml-1.5 px-1.5 py-0.5 rounded text-xs font-medium ${parc.pagas >= parc.numero ? 'bg-green-900/40 text-green-400' : parc.pagas > 0 ? 'bg-yellow-900/30 text-yellow-400' : 'bg-red-900/30 text-red-400'}`}>
+                            {parc.pagas}/{parc.numero}p
+                          </span>
+                        )}
+                      </td>
                       <td className="px-3 py-2 text-right"><ValorMonetario value={m.valor_total} /></td>
                       <td className="px-3 py-2 text-center text-[var(--color-muted)]">{fmtDate(m.data_compra)}</td>
                       <td className="px-3 py-2">
