@@ -165,9 +165,9 @@ export function DashboardPage() {
       .select('*, obras(nome)')
       .eq('user_id', user.id)
       .eq('status', 'previsto')
-      .gte('data_lancamento', hojeStr)
-      .lte('data_lancamento', em15diasStr)
-      .order('data_lancamento', { ascending: true })
+      .gte('data_realizacao', hojeStr)
+      .lte('data_realizacao', em15diasStr)
+      .order('data_realizacao', { ascending: true })
       .limit(5)
 
     setProximosVencimentos((vencimentosRes.data ?? []) as FluxoCaixaComObra[])
@@ -285,7 +285,7 @@ export function DashboardPage() {
               <div className="divide-y divide-[var(--color-border)]">
                 {proximosVencimentos.map((v) => {
                   const dias = Math.ceil(
-                    (new Date(v.data_lancamento + 'T00:00:00').getTime() - new Date().setHours(0,0,0,0)) / 86400000
+                    (new Date((v.data_realizacao ?? v.data_lancamento) + 'T00:00:00').getTime() - new Date().setHours(0,0,0,0)) / 86400000
                   )
                   const badgeColor = dias > 7
                     ? 'bg-[var(--color-success)]/10 text-[var(--color-success)]'

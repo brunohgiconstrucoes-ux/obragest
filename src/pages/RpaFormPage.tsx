@@ -120,9 +120,9 @@ export function RpaFormPage() {
     setSaving(true)
 
     const valorBrutoCents = parseCentavos(values.valor_bruto_reais)
-    const inss = Math.round(valorBrutoCents * obra.aliquota_inss / 100)
-    const iss = Math.round(valorBrutoCents * obra.aliquota_iss / 100)
-    const irrf = Math.round(valorBrutoCents * obra.aliquota_irrf / 100)
+    const inss = Math.round(valorBrutoCents * inssAliq / 100)
+    const iss = Math.round(valorBrutoCents * issAliq / 100)
+    const irrf = Math.round(valorBrutoCents * irrfAliq / 100)
     const pago = valorBrutoCents - inss - iss - irrf
 
     // 1. Insert mao_de_obra
