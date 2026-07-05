@@ -1,15 +1,5 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Check, ChevronsUpDown, Plus } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 
 type Item = { value: string; label: string; sub?: string }
@@ -34,12 +24,26 @@ export function CadastroCombobox({
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [creating, setCreating] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   const filtered = items.filter(i =>
     i.label.toLowerCase().includes(query.toLowerCase())
   )
-
   const exactMatch = items.some(i => i.label.toLowerCase() === query.toLowerCase())
+
+  useEffect(() => {
+    if (!open) return
+    inputRef.current?.focus()
+    function handleMouseDown(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false)
+        setQuery('')
+      }
+    }
+    document.addEventListener('mousedown', handleMouseDown)
+    return () => document.removeEventListener('mousedown', handleMouseDown)
+  }, [open])
 
   async function handleCreate() {
     if (!query.trim() || creating) return
@@ -52,72 +56,73 @@ export function CadastroCombobox({
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className={cn(
-            'justify-between font-normal bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)] hover:bg-[var(--color-surface-2)]',
-            !value && 'text-[var(--color-muted)]',
-            className
-          )}
-        >
-          <span className="truncate">{value || placeholder}</span>
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 text-[var(--color-muted)]" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent
-        className="p-0 bg-[var(--color-surface)] border-[var(--color-border)]"
-        style={{ width: 'var(--radix-popover-trigger-width)' }}
+    <div ref={containerRef} className={cn('relative', className)}>
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className={cn(
+          'w-full flex justify-between items-center px-3 py-2 rounded-md border text-sm',
+          'bg-[var(--color-surface-2)] border-[var(--color-border)]',
+          value ? 'text-[var(--color-text)]' : 'text-[var(--color-muted)]'
+        )}
       >
-        <Command shouldFilter={false}>
-          <CommandInput
-            placeholder="Buscar..."
-            value={query}
-            onValueChange={setQuery}
-            className="text-[var(--color-text)]"
-          />
-          <CommandList>
-            <CommandEmpty>
-              {!query.trim() && (
-                <p className="py-3 text-center text-xs text-[var(--color-muted)]">Nenhum resultado.</p>
-              )}
-            </CommandEmpty>
-            <CommandGroup>
-              {filtered.map(item => (
-                <CommandItem
-                  key={item.value}
-                  value={item.label}
-                  onSelect={() => {
-                    onChange(item.label)
-                    setOpen(false)
-                    setQuery('')
-                  }}
-                  className="text-[var(--color-text)] aria-selected:bg-[var(--color-surface-2)]"
-                >
-                  <Check className={cn('mr-2 h-4 w-4 shrink-0', value === item.label ? 'opacity-100' : 'opacity-0')} />
-                  <span className="truncate">{item.label}</span>
-                  {item.sub && (
-                    <span className="ml-2 text-xs text-[var(--color-muted)] shrink-0">{item.sub}</span>
-                  )}
-                </CommandItem>
-              ))}
-              {query.trim() && !exactMatch && (
-                <CommandItem
-                  value={`__create__${query}`}
-                  onSelect={handleCreate}
-                  className="text-[var(--color-primary)] aria-selected:bg-[var(--color-surface-2)]"
-                >
-                  <Plus className="mr-2 h-4 w-4 shrink-0" />
-                  {creating ? 'Cadastrando...' : `Cadastrar "${query.trim()}"`}
-                </CommandItem>
-              )}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+        <span className="truncate">{value || placeholder}</span>
+        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 text-[var(--color-muted)]" />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 right-0 mt-1 z-[200] rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl">
+          <div className="flex items-center px-3 py-2 border-b border-[var(--color-border)]">
+            <input
+              ref={inputRef}
+              type="text"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Buscar..."
+              className="flex-1 bg-transparent text-sm text-[var(--color-text)] outline-none placeholder:text-[var(--color-muted)]"
+            />
+          </div>
+          <ul className="max-h-52 overflow-y-auto py-1">
+            {filtered.length === 0 && !query.trim() && (
+              <li className="py-3 text-center text-xs text-[var(--color-muted)]">
+                Nenhum resultado.
+              </li>
+            )}
+            {filtered.map(item => (
+              <li
+                key={item.value}
+                onMouseDown={e => {
+                  e.preventDefault()
+                  onChange(item.label)
+                  setOpen(false)
+                  setQuery('')
+                }}
+                className="flex items-center px-3 py-2 text-sm cursor-pointer hover:bg-[var(--color-surface-2)] text-[var(--color-text)]"
+              >
+                <Check
+                  className={cn('mr-2 h-4 w-4 shrink-0', value === item.label ? 'opacity-100' : 'opacity-0')}
+                />
+                <span className="truncate">{item.label}</span>
+                {item.sub && (
+                  <span className="ml-2 text-xs text-[var(--color-muted)] shrink-0">{item.sub}</span>
+                )}
+              </li>
+            ))}
+            {query.trim() && !exactMatch && (
+              <li
+                onMouseDown={e => {
+                  e.preventDefault()
+                  handleCreate()
+                }}
+                className="flex items-center px-3 py-2 text-sm cursor-pointer hover:bg-[var(--color-surface-2)] text-[var(--color-primary)]"
+              >
+                <Plus className="mr-2 h-4 w-4 shrink-0" />
+                {creating ? 'Cadastrando...' : `Cadastrar "${query.trim()}"`}
+              </li>
+            )}
+          </ul>
+        </div>
+      )}
+    </div>
   )
 }
