@@ -49,7 +49,9 @@ const materialSchema = z.object({
   categoria: z.enum(['cimento', 'aco', 'eletrica', 'hidraulica', 'epi', 'ferramentas', 'madeira', 'outros']),
   quantidade: z.coerce.number().positive('Deve ser positivo').optional().or(z.literal('')),
   unidade: z.string().optional(),
+  valor_unitario_reais: z.coerce.number().min(0).optional().or(z.literal('')),
   valor_total_reais: z.coerce.number().positive('Valor obrigatório'),
+  numero_nf: z.string().optional(),
   data_compra: z.string().min(1, 'Obrigatório'),
   forma_pagamento: z.enum(['avista', 'boleto', 'cartao', 'cheque', 'prazo']),
   numero_parcelas: z.coerce.number().int().min(1).max(99).optional().or(z.literal('')),
@@ -190,21 +192,27 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 // ── Material Dialog ──────────────────────────────────────────────────────────
 
-function parseParcelas(obs: string | null): { numero: number; pagas: number; obs: string } {
-  if (!obs) return { numero: 1, pagas: 0, obs: '' }
-  const m = obs.match(/^PARCELAS:(\d+)\/(\d+)\n?/)
-  if (!m) return { numero: 1, pagas: 0, obs }
-  return { numero: parseInt(m[1]), pagas: parseInt(m[2]), obs: obs.replace(/^PARCELAS:\d+\/\d+\n?/, '') }
+function parseParcelas(obs: string | null): { numero: number; pagas: number; nf: string; obs: string } {
+  if (!obs) return { numero: 1, pagas: 0, nf: '', obs: '' }
+  let rest = obs
+  let nf = ''
+  const nfMatch = rest.match(/^NF:([^\n]*)\n?/)
+  if (nfMatch) { nf = nfMatch[1]; rest = rest.replace(/^NF:[^\n]*\n?/, '') }
+  const m = rest.match(/^PARCELAS:(\d+)\/(\d+)\n?/)
+  if (!m) return { numero: 1, pagas: 0, nf, obs: rest }
+  return { numero: parseInt(m[1]), pagas: parseInt(m[2]), nf, obs: rest.replace(/^PARCELAS:\d+\/\d+\n?/, '') }
 }
 
 function buildObservacao(values: MaterialFormValues): string | null {
   const np = values.numero_parcelas === '' || values.numero_parcelas == null ? 1 : Number(values.numero_parcelas)
   const pp = values.parcelas_pagas === '' || values.parcelas_pagas == null ? 0 : Number(values.parcelas_pagas)
+  const nf = values.numero_nf?.trim() ?? ''
   const obs = values.observacao?.trim() ?? ''
-  if (np > 1) {
-    return `PARCELAS:${np}/${pp}${obs ? '\n' + obs : ''}`
-  }
-  return obs || null
+  const parts: string[] = []
+  if (nf) parts.push(`NF:${nf}`)
+  if (np > 1) parts.push(`PARCELAS:${np}/${pp}`)
+  if (obs) parts.push(obs)
+  return parts.length > 0 ? parts.join('\n') : null
 }
 
 function MaterialDialog({ obraId, material, onSaved }: { obraId: string; material?: Material; onSaved: () => void }) {
@@ -219,7 +227,7 @@ function MaterialDialog({ obraId, material, onSaved }: { obraId: string; materia
 
   const parsed = isEdit ? parseParcelas(material.observacao) : { numero: 1, pagas: 0, obs: '' }
 
-  const { register, handleSubmit, reset, control, watch, formState: { errors } } = useForm<MaterialFormValues>({
+  const { register, handleSubmit, reset, control, watch, setValue, formState: { errors } } = useForm<MaterialFormValues>({
     resolver: zodResolver(materialSchema),
     defaultValues: isEdit ? {
       fornecedor: material.fornecedor,
@@ -227,7 +235,9 @@ function MaterialDialog({ obraId, material, onSaved }: { obraId: string; materia
       categoria: material.categoria,
       quantidade: material.quantidade ?? '',
       unidade: material.unidade ?? '',
+      valor_unitario_reais: material.quantidade ? Math.round(material.valor_total / material.quantidade) / 100 : '',
       valor_total_reais: material.valor_total / 100,
+      numero_nf: parsed.nf,
       data_compra: material.data_compra,
       forma_pagamento: material.forma_pagamento,
       numero_parcelas: parsed.numero,
@@ -239,12 +249,24 @@ function MaterialDialog({ obraId, material, onSaved }: { obraId: string; materia
       forma_pagamento: 'avista',
       numero_parcelas: 1,
       parcelas_pagas: 0,
+      numero_nf: '',
+      valor_unitario_reais: '',
     },
   })
 
   const formaPag = watch('forma_pagamento')
   const numParcelas = Number(watch('numero_parcelas') ?? 1)
   const showParcelas = formaPag !== 'avista' && formaPag !== 'cheque'
+  const qtdWatch = watch('quantidade')
+  const vunitWatch = watch('valor_unitario_reais')
+
+  useEffect(() => {
+    const qty = Number(qtdWatch)
+    const unit = Number(vunitWatch)
+    if (qty > 0 && unit > 0) {
+      setValue('valor_total_reais', parseFloat((qty * unit).toFixed(2)))
+    }
+  }, [qtdWatch, vunitWatch, setValue])
 
   async function onSubmit(values: MaterialFormValues) {
     setSaving(true)
@@ -352,6 +374,7 @@ function MaterialDialog({ obraId, material, onSaved }: { obraId: string; materia
       <DialogContent
         className="bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-text)] max-w-lg"
         onPointerDownOutside={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
       >
         <DialogHeader>
           <DialogTitle className="text-[var(--color-text)]">{isEdit ? 'Editar Material' : 'Lançar Material'}</DialogTitle>
@@ -363,7 +386,7 @@ function MaterialDialog({ obraId, material, onSaved }: { obraId: string; materia
               <CadastroCombobox
                 items={fornecedorItemsDlg}
                 value={watch('fornecedor')}
-                onChange={v => { reset({ ...watch(), fornecedor: v }) }}
+                onChange={v => { setValue('fornecedor', v, { shouldValidate: true }) }}
                 onCreateNew={addFornecedor}
                 placeholder="Nome do fornecedor"
                 className="mt-1 w-full"
@@ -376,14 +399,31 @@ function MaterialDialog({ obraId, material, onSaved }: { obraId: string; materia
                 items={materialItemsDlg}
                 value={watch('item')}
                 onChange={v => {
+                  setValue('item', v, { shouldValidate: true })
                   const found = catalogoMateriais.find(m => m.descricao === v)
-                  reset({ ...watch(), item: v, unidade: found?.unidade ?? watch('unidade') })
+                  if (found) {
+                    setValue('unidade', found.unidade)
+                    setValue('categoria', found.categoria)
+                  }
                 }}
                 onCreateNew={nome => addMaterial(nome)}
                 placeholder="Descrição do material"
                 className="mt-1 w-full"
               />
               {errors.item && <p className="text-xs text-[var(--color-danger)] mt-0.5">{errors.item.message}</p>}
+            </div>
+            <div>
+              <Label className="text-[var(--color-muted)] text-xs">Nº da Nota Fiscal</Label>
+              <Input
+                {...register('numero_nf')}
+                placeholder="Ex: 000456"
+                className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]"
+              />
+            </div>
+            <div>
+              <Label className="text-[var(--color-muted)] text-xs">Data da Compra *</Label>
+              <Input {...register('data_compra')} type="date" className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]" />
+              {errors.data_compra && <p className="text-xs text-[var(--color-danger)] mt-0.5">{errors.data_compra.message}</p>}
             </div>
             <div>
               <Label className="text-[var(--color-muted)] text-xs">Categoria *</Label>
@@ -432,14 +472,13 @@ function MaterialDialog({ obraId, material, onSaved }: { obraId: string; materia
               <Input {...register('unidade')} className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]" />
             </div>
             <div>
+              <Label className="text-[var(--color-muted)] text-xs">Valor Unit. (R$)</Label>
+              <Input {...register('valor_unitario_reais')} type="number" step="0.01" placeholder="0,00" className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]" />
+            </div>
+            <div>
               <Label className="text-[var(--color-muted)] text-xs">Valor Total (R$) *</Label>
               <Input {...register('valor_total_reais')} type="number" step="0.01" className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]" />
               {errors.valor_total_reais && <p className="text-xs text-[var(--color-danger)] mt-0.5">{errors.valor_total_reais.message}</p>}
-            </div>
-            <div>
-              <Label className="text-[var(--color-muted)] text-xs">Data da Compra *</Label>
-              <Input {...register('data_compra')} type="date" className="mt-1 bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-text)]" />
-              {errors.data_compra && <p className="text-xs text-[var(--color-danger)] mt-0.5">{errors.data_compra.message}</p>}
             </div>
             {/* Parcelamento */}
             {showParcelas && (
