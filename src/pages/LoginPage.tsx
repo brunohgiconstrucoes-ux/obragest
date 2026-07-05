@@ -19,12 +19,15 @@ export function LoginPage() {
     e.preventDefault()
     setError('')
     setLoading(true)
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) {
-      setError('E-mail ou senha inválidos. Verifique suas credenciais.')
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) {
+        setError('E-mail ou senha inválidos. Verifique suas credenciais.')
+      } else {
+        navigate('/')
+      }
+    } finally {
       setLoading(false)
-    } else {
-      navigate('/')
     }
   }
 

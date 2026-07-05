@@ -129,15 +129,15 @@ export function DashboardPage() {
         .select('tipo, escopo, origem, valor')
         .eq('user_id', user.id)
         .eq('status', 'realizado')
-        .gte('data_competencia', primeiroDiaMes)
-        .lte('data_competencia', ultimoDiaMes),
+        .gte('data_lancamento', primeiroDiaMes)
+        .lte('data_lancamento', ultimoDiaMes),
       supabase
         .from('fluxo_caixa')
         .select('tipo, escopo, origem, valor')
         .eq('user_id', user.id)
         .eq('status', 'realizado')
-        .gte('data_competencia', primeiroDiaMesAnt)
-        .lte('data_competencia', ultimoDiaMesAnt),
+        .gte('data_lancamento', primeiroDiaMesAnt)
+        .lte('data_lancamento', ultimoDiaMesAnt),
     ])
 
     const fluxoMes = (fluxoMesRes.data ?? []) as FluxoCaixa[]

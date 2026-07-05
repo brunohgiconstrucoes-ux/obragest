@@ -99,9 +99,9 @@ export function RpaFormPage() {
   // ── Derived calculations ──
   const valorBrutoCentavos = parseCentavos(valorBrutoStr ?? '')
 
-  const inssAliq = (obra?.aliquota_inss ?? 0) || (perfil?.aliquota_inss ?? 11)
-  const issAliq = (obra?.aliquota_iss ?? 0) || (perfil?.aliquota_iss ?? 2)
-  const irrfAliq = (obra?.aliquota_irrf ?? 0) || (perfil?.aliquota_irrf ?? 1.5)
+  const inssAliq = obra?.aliquota_inss ?? perfil?.aliquota_inss ?? 11
+  const issAliq = obra?.aliquota_iss ?? perfil?.aliquota_iss ?? 2
+  const irrfAliq = obra?.aliquota_irrf ?? perfil?.aliquota_irrf ?? 1.5
 
   const retencaoInss = Math.round(valorBrutoCentavos * inssAliq / 100)
   const retencaoIss = Math.round(valorBrutoCentavos * issAliq / 100)
@@ -182,8 +182,12 @@ export function RpaFormPage() {
     }
 
     // 3. Generate PDF
-    const mdoObj: MaoDeObra = mdo as MaoDeObra
-    await gerarRpaPDF(obra, mdoObj, perfil)
+    try {
+      const mdoObj: MaoDeObra = mdo as MaoDeObra
+      await gerarRpaPDF(obra, mdoObj, perfil)
+    } catch {
+      // PDF failure doesn't roll back the saved record
+    }
 
     toast({ description: 'RPA registrado com sucesso!' })
     navigate(`/obras/${obra.id}?tab=mao-de-obra`)

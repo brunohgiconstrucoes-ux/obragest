@@ -201,8 +201,12 @@ export function AvulsoFormPage() {
     }
 
     // 3. Generate PDF
-    const mdoObj: MaoDeObra = mdo as MaoDeObra
-    await gerarReciboAvulsoPDF(obra, mdoObj, perfil)
+    try {
+      const mdoObj: MaoDeObra = mdo as MaoDeObra
+      await gerarReciboAvulsoPDF(obra, mdoObj, perfil)
+    } catch {
+      // PDF failure doesn't roll back the saved record
+    }
 
     toast({ description: 'Avulso registrado com sucesso!' })
     navigate(`/obras/${obra.id}?tab=mao-de-obra`)

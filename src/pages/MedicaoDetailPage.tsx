@@ -143,7 +143,7 @@ function EditMedicaoForm({
       (supabase.from('medicao_itens') as any).update({
         quantidade_executada: r.quantidade_executada,
         valor_total: r.valor_total,
-      }).eq('id', r.id)
+      }).eq('id', r.id).eq('user_id', user!.id)
     )
 
     const medicaoUpdate = {
@@ -158,7 +158,13 @@ function EditMedicaoForm({
       valor_liquido: liquido,
     }
 
-    await Promise.all(itemUpdates)
+    const itemResults = await Promise.all(itemUpdates)
+    const itemError = itemResults.find(r => r.error)?.error
+    if (itemError) {
+      toast({ description: 'Erro ao atualizar itens da medição.', variant: 'destructive' })
+      setSaving(false)
+      return
+    }
     const { error } = await supabase.from('medicoes').update(medicaoUpdate).eq('id', medicao.id)
 
     if (error) {

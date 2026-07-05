@@ -47,6 +47,7 @@ export function MedicaoFormPage() {
   const [loadingObra, setLoadingObra] = useState(true)
 
   const [saldos, setSaldos] = useState<VwPlanilhaSaldo[]>([])
+  const [totalItensPlanilha, setTotalItensPlanilha] = useState(0)
   const [loadingSaldos, setLoadingSaldos] = useState(true)
 
   const [proximoNumero, setProximoNumero] = useState<number>(1)
@@ -84,7 +85,9 @@ export function MedicaoFormPage() {
 
       setObra(obraData)
 
-      const itensComSaldo = (saldoData ?? []).filter(i => i.quantidade_restante > 0)
+      const todosItens = saldoData ?? []
+      const itensComSaldo = todosItens.filter(i => i.quantidade_restante > 0)
+      setTotalItensPlanilha(todosItens.length)
       setSaldos(itensComSaldo)
 
       const maxNum = (medData ?? []).length > 0 ? medData![0].numero : 0
@@ -194,7 +197,7 @@ export function MedicaoFormPage() {
     }
 
     // Step 3: Insert fluxo_caixa
-    const dataLancamento = values.data_prevista_recebimento || today()
+    const dataLancamento = values.data_prevista_recebimento || values.periodo_fim || today()
     const { error: fluxoErr } = await supabase.from('fluxo_caixa').insert({
       user_id: user.id,
       obra_id: obra.id,
@@ -254,14 +257,27 @@ export function MedicaoFormPage() {
         <Card className="bg-[var(--color-surface)] border-[var(--color-border)]">
           <CardContent className="p-8 text-center">
             <AlertTriangle className="w-10 h-10 mx-auto mb-4 text-[var(--color-warning)]" />
-            <h2 className="text-lg font-semibold text-[var(--color-text)] mb-2">Planilha de serviços não cadastrada</h2>
-            <p className="text-sm text-[var(--color-muted)] mb-6 max-w-md mx-auto">
-              Para abrir uma medição é necessário cadastrar os itens da planilha de serviços primeiro.
-              Nenhum item com saldo disponível foi encontrado.
-            </p>
-            <Button asChild className="bg-[var(--color-primary)] hover:bg-[var(--color-primary-dim)] text-black">
-              <Link to={`/obras/${obra.id}/planilha`}>Cadastrar planilha</Link>
-            </Button>
+            {totalItensPlanilha === 0 ? (
+              <>
+                <h2 className="text-lg font-semibold text-[var(--color-text)] mb-2">Planilha de serviços não cadastrada</h2>
+                <p className="text-sm text-[var(--color-muted)] mb-6 max-w-md mx-auto">
+                  Para abrir uma medição é necessário cadastrar os itens da planilha de serviços primeiro.
+                </p>
+                <Button asChild className="bg-[var(--color-primary)] hover:bg-[var(--color-primary-dim)] text-black">
+                  <Link to={`/obras/${obra.id}/planilha`}>Cadastrar planilha</Link>
+                </Button>
+              </>
+            ) : (
+              <>
+                <h2 className="text-lg font-semibold text-[var(--color-text)] mb-2">Obra 100% medida</h2>
+                <p className="text-sm text-[var(--color-muted)] mb-6 max-w-md mx-auto">
+                  Todos os {totalItensPlanilha} itens da planilha já atingiram 100% da quantidade contratada. Não há saldo disponível para nova medição.
+                </p>
+                <Button variant="outline" onClick={() => navigate(`/obras/${obra.id}?tab=medicoes`)} className="border-[var(--color-border)] text-[var(--color-text)]">
+                  Ver medições
+                </Button>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>

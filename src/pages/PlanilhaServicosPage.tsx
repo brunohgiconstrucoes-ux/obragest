@@ -386,7 +386,7 @@ export function PlanilhaServicosPage() {
                             return (
                               <tr key={i} className={`border-t border-[var(--color-border)] ${hasErr ? 'bg-[var(--color-danger)]/10' : ''}`}>
                                 {[0,1,2,3,4].map(j => (
-                                  <td key={j} className={`px-2 py-1 ${hasErr && (j === 1 && !row[1]?.trim() || j >= 3) ? 'text-[var(--color-danger)]' : 'text-[var(--color-text)]'}`}>
+                                  <td key={j} className={`px-2 py-1 ${hasErr && (j === 1 && !row[1]?.trim() || (j >= 3 && hasErr)) ? 'text-[var(--color-danger)]' : 'text-[var(--color-text)]'}`}>
                                     {row[j] ?? ''}
                                   </td>
                                 ))}

@@ -500,6 +500,10 @@ export type Equipamento = {
   numero_serie: string | null
   valor_aquisicao: number // centavos (bigint)
   custo_diaria: number // centavos (bigint)
+  empresa_locadora: string | null
+  data_inicio_locacao: string | null
+  data_fim_locacao: string | null
+  custo_tipo: 'diaria' | 'mensal'
   proxima_manutencao: string | null
   status: EquipamentoStatus
   created_at: string

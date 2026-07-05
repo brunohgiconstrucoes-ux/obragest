@@ -46,5 +46,9 @@ Se algum campo não for encontrado, use null.`
   const text = result.response.text().trim()
   const clean = text.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim()
 
-  return JSON.parse(clean) as NfExtraida
+  try {
+    return JSON.parse(clean) as NfExtraida
+  } catch {
+    throw new Error(`Gemini retornou resposta inválida: ${clean.slice(0, 200)}`)
+  }
 }

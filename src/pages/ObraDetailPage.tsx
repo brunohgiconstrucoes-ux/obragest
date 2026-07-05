@@ -854,7 +854,7 @@ export function ObraDetailPage() {
 
   async function handleExcluirMaterial(matId: string) {
     if (!window.confirm('Excluir este material? O lançamento no fluxo de caixa também será removido.')) return
-    await supabase.from('fluxo_caixa').delete().eq('origem_id', matId).eq('origem', 'material')
+    await supabase.from('fluxo_caixa').delete().eq('origem_id', matId).eq('origem', 'material').eq('user_id', user!.id)
     const { error } = await supabase.from('materiais').delete().eq('id', matId)
     if (error) {
       toast({ description: 'Erro ao excluir material.', variant: 'destructive' })
@@ -977,12 +977,17 @@ export function ObraDetailPage() {
 
   async function marcarMaoPago(mo: MaoDeObra) {
     if (!user || !obra) return
-    const novoStatus = mo.status === 'realizado' ? 'previsto' : 'realizado'
+    const novoStatus: LancamentoStatus = mo.status === 'realizado' ? 'previsto' : 'realizado'
     const dataReal = novoStatus === 'realizado' ? todayStr() : null
-    await supabase.from('mao_de_obra').update({ status: novoStatus, data_pagamento: dataReal ?? mo.data_pagamento })
+    const { error: e1 } = await supabase.from('mao_de_obra')
+      .update({ status: novoStatus, data_pagamento: dataReal ?? mo.data_pagamento })
       .eq('id', mo.id).eq('user_id', user.id)
-    await supabase.from('fluxo_caixa').update({ status: novoStatus, data_realizacao: dataReal })
-      .eq('origem_id', mo.id).eq('origem', 'mao_de_obra' as FluxoOrigem)
+    const { error: e2 } = await supabase.from('fluxo_caixa')
+      .update({ status: novoStatus, data_realizacao: dataReal })
+      .eq('origem_id', mo.id).eq('origem', 'mao_de_obra' as FluxoOrigem).eq('user_id', user.id)
+    if (e1 || e2) {
+      toast({ description: 'Erro ao atualizar status.', variant: 'destructive' })
+    }
     loadMaoDeObra()
   }
 
