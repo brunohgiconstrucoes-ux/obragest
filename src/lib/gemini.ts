@@ -12,10 +12,16 @@ export type NfExtraida = {
 
 export async function extrairDadosNf(file: File): Promise<NfExtraida> {
   const genAI = new GoogleGenerativeAI(apiKey)
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
 
   const bytes = await file.arrayBuffer()
-  const base64 = btoa(String.fromCharCode(...new Uint8Array(bytes)))
+  const uint8 = new Uint8Array(bytes)
+  let binary = ''
+  for (let i = 0; i < uint8.length; i += 8192) {
+    binary += String.fromCharCode(...uint8.subarray(i, i + 8192))
+  }
+  const base64 = btoa(binary)
+  const mimeType = (file.type || 'application/pdf') as 'application/pdf'
 
   const prompt = `Você está analisando uma Nota Fiscal de Serviço Eletrônica (NFS-e / DANFSe) brasileira.
 Extraia os campos abaixo e retorne SOMENTE um JSON puro, sem markdown, sem blocos de código, sem texto adicional.
@@ -39,7 +45,7 @@ JSON esperado:
 Se algum campo não for encontrado, use null.`
 
   const result = await model.generateContent([
-    { inlineData: { mimeType: file.type as any, data: base64 } },
+    { inlineData: { mimeType, data: base64 } },
     prompt,
   ])
 
