@@ -373,8 +373,6 @@ function MaterialDialog({ obraId, material, onSaved }: { obraId: string; materia
       </DialogTrigger>
       <DialogContent
         className="bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-text)] max-w-lg"
-        onPointerDownOutside={(e) => e.preventDefault()}
-        onInteractOutside={(e) => e.preventDefault()}
       >
         <DialogHeader>
           <DialogTitle className="text-[var(--color-text)]">{isEdit ? 'Editar Material' : 'Lançar Material'}</DialogTitle>
