@@ -7,7 +7,6 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { useToast } from '@/hooks/use-toast'
 import { useAlertas } from '@/hooks/useAlertas'
-import { ValorMonetario } from '@/components/shared/ValorMonetario'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import type { Obra, VwObraKpis, FluxoCaixa, Medicao } from '@/types'
 
