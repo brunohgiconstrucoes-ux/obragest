@@ -98,6 +98,7 @@ function EditMedicaoForm({
   onSaved: (updated: Medicao, updatedItens: MedicaoItem[]) => void
   onCancel: () => void
 }) {
+  const { user } = useAuth()
   const { toast } = useToast()
   const [saving, setSaving] = useState(false)
   const [rows, setRows] = useState<EditItemRow[]>(() =>

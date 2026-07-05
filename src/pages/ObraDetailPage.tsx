@@ -225,7 +225,7 @@ function MaterialDialog({ obraId, material, onSaved }: { obraId: string; materia
   const fornecedorItemsDlg = cadastroFornecedores.map(f => ({ value: f.id, label: f.nome }))
   const materialItemsDlg = catalogoMateriais.map(m => ({ value: m.id, label: m.descricao, sub: m.unidade }))
 
-  const parsed = isEdit ? parseParcelas(material.observacao) : { numero: 1, pagas: 0, obs: '' }
+  const parsed = isEdit ? parseParcelas(material.observacao) : { numero: 1, pagas: 0, nf: '', obs: '' }
 
   const { register, handleSubmit, reset, control, watch, setValue, formState: { errors } } = useForm<MaterialFormValues>({
     resolver: zodResolver(materialSchema),
